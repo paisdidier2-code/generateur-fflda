@@ -4574,7 +4574,8 @@ if mode_app.startswith("2"):
                     st.markdown(f"#### 🤼 {poule}")
                     sous_df = df_bilan[df_bilan['Poule'] == poule][['Clt', 'Nom', 'Club', 'Poids', 'Points']].copy()
                     sous_df['Points'] = sous_df['Points'].astype(int)
-                    st.table(sous_df)
+                    sous_df = sous_df.reset_index(drop=True)
+                    st.dataframe(sous_df, use_container_width=True, hide_index=True)
 
             with tab_bilan_2:
                 st.subheader(f"🛡️ Podium des Clubs Engagés — {nom_comp_officiel}")
@@ -4865,37 +4866,40 @@ else:
             elif "Age" not in df_raw.columns:
                 df_raw["Age"] = ""
 
-            # 2. Club / Sigle du Club (Priorité absolue au Sigle du club)
+            # 2. Club / Sigle du Club (priorité absolue au NOM/SIGLE et rejet des numéros de club)
             club_col_found = None
+            numeric_club_cols = []
             
-            # Priorité 1 : Sigle du club / Sigle club / Sigle
             for col_name in df_raw.columns:
                 col_lower = str(col_name).strip().lower()
-                if any(k in col_lower for k in ["sigle du club", "sigle club", "sigle_club", "sigle"]):
-                    club_col_found = col_name
-                    break
+                if any(n in col_lower for n in ["n°", "num", "code", "id", "numéro", "numero"]):
+                    continue
+                if any(k in col_lower for k in ["sigle du club", "sigle club", "sigle", "nom du club", "nom club", "libellé club", "libelle club", "nom structure", "club"]):
+                    # Vérification si les données de la colonne sont des chiffres purs (ex: 1224012)
+                    sample_vals = [str(v).strip() for v in df_raw[col_name].dropna().head(10)]
+                    is_numeric_col = len(sample_vals) > 0 and all(v.isdigit() for v in sample_vals)
+                    if not is_numeric_col:
+                        club_col_found = col_name
+                        break
+                    else:
+                        numeric_club_cols.append(col_name)
 
-            # Priorité 2 : Nom du club / Libellé club / Nom structure (en excluant N°, Num, Code, ID)
             if not club_col_found:
                 for col_name in df_raw.columns:
                     col_lower = str(col_name).strip().lower()
                     if any(n in col_lower for n in ["n°", "num", "code", "id", "numéro", "numero"]):
                         continue
-                    if any(k in col_lower for k in ["nom du club", "nom club", "libellé club", "libelle club", "nom structure", "club nom", "nom_club"]):
-                        club_col_found = col_name
-                        break
-                        
-            # Priorité 3 : colonne simplement "club", "structure", "équipe", "equipe" (sans n°/code/id)
-            if not club_col_found:
-                for col_name in df_raw.columns:
-                    col_lower = str(col_name).strip().lower()
-                    if any(n in col_lower for n in ["n°", "num", "code", "id", "numéro", "numero"]):
-                        continue
-                    if any(k in col_lower for k in ["club", "équipe", "equipe", "structure"]):
-                        club_col_found = col_name
-                        break
+                    if any(k in col_lower for k in ["club", "équipe", "equipe", "structure"]) and col_name not in numeric_club_cols:
+                        sample_vals = [str(v).strip() for v in df_raw[col_name].dropna().head(10)]
+                        is_numeric_col = len(sample_vals) > 0 and all(v.isdigit() for v in sample_vals)
+                        if not is_numeric_col:
+                            club_col_found = col_name
+                            break
 
-            # Fallback Priorité 4 : n'importe quelle colonne contenant "club" ou "structure"
+            # Fallback si seule une colonne numérique existait
+            if not club_col_found and numeric_club_cols:
+                club_col_found = numeric_club_cols[0]
+
             if not club_col_found:
                 for col_name in df_raw.columns:
                     col_lower = str(col_name).strip().lower()

@@ -18,11 +18,11 @@ st.set_page_config(page_title="Générateur Officiel FFLDA", page_icon="🤼", l
 if "authentifie" not in st.session_state:
     st.session_state["authentifie"] = False
 
-# URL Google Sheets CSV par défaut (configurable via Streamlit Secrets ou l'interface)
+# URL Google Sheets CSV par défaut (configurée avec votre tableau)
 try:
-    URL_GOOGLE_SHEETS_DEFAUT = st.secrets.get("GSHEETS_CODES_URL", "")
+    URL_GOOGLE_SHEETS_DEFAUT = st.secrets.get("GSHEETS_CODES_URL", "https://docs.google.com/spreadsheets/d/1VQ_L4oy_587wFpbEnuAeehimbV8ax813m3_YQq1Uzuk/edit?usp=sharing")
 except Exception:
-    URL_GOOGLE_SHEETS_DEFAUT = ""
+    URL_GOOGLE_SHEETS_DEFAUT = "https://docs.google.com/spreadsheets/d/1VQ_L4oy_587wFpbEnuAeehimbV8ax813m3_YQq1Uzuk/edit?usp=sharing"
 
 def verifier_code_acces(code_saisi, url_csv):
     if not code_saisi or not str(code_saisi).strip():
@@ -383,7 +383,7 @@ def repartir_tableau_protection_clubs(participants, nb_byes, nb_prelim):
     """
     clubs = collections.defaultdict(list)
     for p in participants:
-        c = p.get('Club', '').strip()
+        c = str(p.get('Club', '') or '').strip()
         if not c or c in ['-', 'Comité Non Renseigné', 'Sans club']:
             clubs[f"_indiv_{id(p)}"].append(p)
         else:
@@ -439,7 +439,7 @@ def repartir_tableau_protection_clubs(participants, nb_byes, nb_prelim):
     if nb_prelim > 0:
         club_groups = collections.defaultdict(list)
         for p in prelim_list:
-            c = p.get('Club', '').strip()
+            c = str(p.get('Club', '') or '').strip()
             club_groups[c].append(p)
         sorted_prelim_clubs = sorted(club_groups.values(), key=len, reverse=True)
         flattened = [p for grp in sorted_prelim_clubs for p in grp]
@@ -559,7 +559,7 @@ def generer_competition_u13(age, style_grp, suffixe_niveau, cat_poids, participa
             if separer_clubs:
                 clubs = collections.defaultdict(list)
                 for p in participants:
-                    c = p.get('Club', '').strip()
+                    c = str(p.get('Club', '') or '').strip()
                     if not c or c in ['-', 'Comité Non Renseigné', 'Sans club']:
                         clubs[f"_indiv_{id(p)}"].append(p)
                     else:
@@ -578,7 +578,7 @@ def generer_competition_u13(age, style_grp, suffixe_niveau, cat_poids, participa
                 # Appariement des 6 autres sans fratricide
                 club_groups = collections.defaultdict(list)
                 for p in reste:
-                    c = p.get('Club', '').strip()
+                    c = str(p.get('Club', '') or '').strip()
                     club_groups[c].append(p)
                 sorted_reste_clubs = sorted(club_groups.values(), key=len, reverse=True)
                 flattened = [p for grp in sorted_reste_clubs for p in grp]
@@ -597,7 +597,7 @@ def generer_competition_u13(age, style_grp, suffixe_niveau, cat_poids, participa
                     pairs.append((p1, p2))
                 # Séparation Haut / Bas : q1 et q2 sont en Haut, q3 et p_exempt sont en Bas
                 # Si un match contient un coéquipier de p_exempt, il doit être en q1 ou q2 (Haut)
-                c_ex = p_exempt.get('Club', '').strip()
+                c_ex = str(p_exempt.get('Club', '') or '').strip()
                 if c_ex and c_ex not in ['-', 'Comité Non Renseigné', 'Sans club']:
                     for i in range(3):
                         m = pairs[i]

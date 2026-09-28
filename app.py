@@ -4156,6 +4156,26 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         except (ValueError, TypeError):
             return val
 
+    def est_ligne_lutteur_valide(nom_val, club_val):
+        if nom_val is None:
+            return False
+        nom_s = str(nom_val).strip().lower()
+        club_s = str(club_val or "").strip().lower()
+        if not nom_s or nom_s in ["none", "nan", "-", ""]:
+            return False
+        invalides = [
+            "nom", "nom prénom", "nom prenom", "nom & prénom", "nom/prénom", 
+            "participant", "lutteur", "liste des participants", "n°", "clt", "rang",
+            "club", "poids", "comité", "comite", "points", "total pts", "total vict"
+        ]
+        if nom_s in invalides or nom_s.startswith("catégorie") or nom_s.startswith("poule") or nom_s.startswith("compétition") or nom_s.startswith("tournoi"):
+            return False
+        if club_s in ["club", "poids", "comité", "comite", "points", "total pts", "clt", "n°"]:
+            return False
+        if "kg" in nom_s or "kg" in club_s:
+            return False
+        return True
+
     for nom_feuille in onglets_poules:
         ws = wb_data[nom_feuille]
         
@@ -4170,21 +4190,41 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         
         # --- CAS A : PLATEAU U7 ---
         if "u7" in titre_lower or "plateau" in titre_lower:
-            r = 5
-            while ws.cell(row=r, column=2).value is not None:
-                nom = str(ws.cell(row=r, column=2).value).strip()
-                club = str(ws.cell(row=r, column=3).value or "Indépendant").strip()
-                poids = formater_poids_local(ws.cell(row=r, column=4).value)
-                
-                tous_les_resultats.append({
-                    "Poule": nom_feuille,
-                    "Nom": nom,
-                    "Club": club if club not in ["", "-", "None"] else "Indépendant",
-                    "Comité": "Comité Non Renseigné",
-                    "Poids": poids,
-                    "Points": 0,
-                    "Clt": 1  # Tous récompensés en U7 FFLDA
-                })
+            h_row = 4
+            col_nom, col_club, col_poids = 2, 3, 4
+            for r_search in [4, 5, 3]:
+                for c_idx in range(1, ws.max_column + 1):
+                    val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
+                    if "nom" in val_h:
+                        col_nom = c_idx
+                        h_row = r_search
+                    elif "club" in val_h:
+                        col_club = c_idx
+                    elif "poids" in val_h:
+                        col_poids = c_idx
+                if col_nom:
+                    break
+            
+            r = h_row + 1
+            while r <= ws.max_row:
+                nom_raw = ws.cell(row=r, column=col_nom).value
+                if nom_raw is None and r > h_row + 20:
+                    break
+                if nom_raw is not None:
+                    nom = str(nom_raw).strip()
+                    club = str(ws.cell(row=r, column=col_club).value or "Indépendant").strip() if col_club else "Indépendant"
+                    poids = formater_poids_local(ws.cell(row=r, column=col_poids).value) if col_poids else ""
+                    
+                    if est_ligne_lutteur_valide(nom, club):
+                        tous_les_resultats.append({
+                            "Poule": nom_feuille,
+                            "Nom": nom,
+                            "Club": club if club not in ["", "-", "None"] else "Indépendant",
+                            "Comité": "Comité Non Renseigné",
+                            "Poids": poids,
+                            "Points": 0,
+                            "Clt": 1  # Tous récompensés en U7 FFLDA
+                        })
                 r += 1
             continue
 
@@ -4204,11 +4244,17 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     elif "🥉" in v_cell or "BRONZE" in v_cell:
                         podium_croisees[3] = v_cell
             
+            col_nom_cr, col_club_cr = 3, 4
+            for c_idx in range(1, 10):
+                v_h = str(ws.cell(row=5, column=c_idx).value or "").strip().lower()
+                if "nom" in v_h: col_nom_cr = c_idx
+                elif "club" in v_h: col_club_cr = c_idx
+            
             # Lecture Poule A
-            for r_a in range(6, 9):
-                nom_a = ws.cell(row=r_a, column=3).value
-                if nom_a:
-                    club_a = str(ws.cell(row=r_a, column=4).value or "Indépendant").strip()
+            for r_a in range(6, 11):
+                nom_a = ws.cell(row=r_a, column=col_nom_cr).value
+                club_a = str(ws.cell(row=r_a, column=col_club_cr).value or "Indépendant").strip()
+                if nom_a and est_ligne_lutteur_valide(nom_a, club_a):
                     pts_a = ws.cell(row=r_a, column=8).value
                     clt_a = ws.cell(row=r_a, column=1).value
                     participants_croisees.append({
@@ -4217,10 +4263,10 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     })
             
             # Lecture Poule B
-            for r_b in range(12, 15):
-                nom_b = ws.cell(row=r_b, column=3).value
-                if nom_b:
-                    club_b = str(ws.cell(row=r_b, column=4).value or "Indépendant").strip()
+            for r_b in range(12, 17):
+                nom_b = ws.cell(row=r_b, column=col_nom_cr).value
+                club_b = str(ws.cell(row=r_b, column=col_club_cr).value or "Indépendant").strip()
+                if nom_b and est_ligne_lutteur_valide(nom_b, club_b):
                     pts_b = ws.cell(row=r_b, column=8).value
                     clt_b = ws.cell(row=r_b, column=1).value
                     participants_croisees.append({
@@ -4266,17 +4312,38 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         # --- CAS C : TABLEAU U13 (Élimination directe avec repêchage) ---
         if "tableau" in titre_lower or (ws.cell(row=4, column=1).value == "N°" and "nom" in str(ws.cell(row=4, column=2).value or "").lower()):
             participants_tableau = []
-            r = 5
-            while ws.cell(row=r, column=2).value is not None:
-                nom = str(ws.cell(row=r, column=2).value).strip()
-                club = str(ws.cell(row=r, column=3).value or "Indépendant").strip()
-                poids = formater_poids_local(ws.cell(row=r, column=4).value)
-                participants_tableau.append({
-                    "Nom": nom,
-                    "Club": club if club not in ["", "-", "None"] else "Indépendant",
-                    "Poids": poids,
-                    "Clt": None
-                })
+            h_row = 4
+            col_nom, col_club, col_poids = 2, 3, 4
+            for r_search in [4, 5, 3]:
+                for c_idx in range(1, ws.max_column + 1):
+                    val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
+                    if "nom" in val_h:
+                        col_nom = c_idx
+                        h_row = r_search
+                    elif "club" in val_h:
+                        col_club = c_idx
+                    elif "poids" in val_h:
+                        col_poids = c_idx
+                if col_nom:
+                    break
+            
+            r = h_row + 1
+            while r <= ws.max_row:
+                nom_raw = ws.cell(row=r, column=col_nom).value
+                if nom_raw is None and r > h_row + 25:
+                    break
+                if nom_raw is not None:
+                    nom = str(nom_raw).strip()
+                    club = str(ws.cell(row=r, column=col_club).value or "Indépendant").strip() if col_club else "Indépendant"
+                    poids = formater_poids_local(ws.cell(row=r, column=col_poids).value) if col_poids else ""
+                    
+                    if est_ligne_lutteur_valide(nom, club):
+                        participants_tableau.append({
+                            "Nom": nom,
+                            "Club": club if club not in ["", "-", "None"] else "Indépendant",
+                            "Poids": poids,
+                            "Clt": None
+                        })
                 r += 1
             
             podium_tableau = {}
@@ -4357,36 +4424,42 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         
         r = h_row + 1
         lutteurs_poule = []
-        while ws.cell(row=r, column=col_nom).value is not None:
-            nom = ws.cell(row=r, column=col_nom).value
-            club = ws.cell(row=r, column=col_club).value if col_club else "Indépendant"
-            comite_val = ws.cell(row=r, column=col_comite).value if col_comite else None
-            comite = str(comite_val).strip() if (comite_val and str(comite_val).strip() not in ["", "None", "nan", "-"]) else "Comité Non Renseigné"
-            
-            total_pts = ws.cell(row=r, column=col_total_pts).value if col_total_pts else 0
-            poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
-            poids_val = formater_poids_local(poids_raw)
-            
-            try:
-                pts_val = int(round(float(total_pts))) if total_pts is not None else 0
-            except (ValueError, TypeError):
-                pts_val = 0
-            
-            clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
-            try:
-                clt_val = int(float(str(clt_raw).strip())) if clt_raw is not None and str(clt_raw).strip() not in ['', 'NR', 'None', '-'] else None
-            except (ValueError, TypeError):
-                clt_val = None
+        while r <= ws.max_row:
+            nom_raw = ws.cell(row=r, column=col_nom).value
+            if nom_raw is None and r > h_row + 15:
+                break
+            if nom_raw is not None:
+                nom = str(nom_raw).strip()
+                club = str(ws.cell(row=r, column=col_club).value or "Indépendant").strip() if col_club else "Indépendant"
                 
-            lutteurs_poule.append({
-                "Poule": nom_feuille,
-                "Nom": str(nom).strip(),
-                "Club": str(club).strip() if club else "Indépendant",
-                "Comité": comite,
-                "Poids": poids_val,
-                "Points": pts_val,
-                "Clt_Excel": clt_val
-            })
+                if est_ligne_lutteur_valide(nom, club):
+                    comite_val = ws.cell(row=r, column=col_comite).value if col_comite else None
+                    comite = str(comite_val).strip() if (comite_val and str(comite_val).strip() not in ["", "None", "nan", "-"]) else "Comité Non Renseigné"
+                    
+                    total_pts = ws.cell(row=r, column=col_total_pts).value if col_total_pts else 0
+                    poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
+                    poids_val = formater_poids_local(poids_raw)
+                    
+                    try:
+                        pts_val = int(round(float(total_pts))) if total_pts is not None else 0
+                    except (ValueError, TypeError):
+                        pts_val = 0
+                    
+                    clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
+                    try:
+                        clt_val = int(float(str(clt_raw).strip())) if clt_raw is not None and str(clt_raw).strip() not in ['', 'NR', 'None', '-'] else None
+                    except (ValueError, TypeError):
+                        clt_val = None
+                        
+                    lutteurs_poule.append({
+                        "Poule": nom_feuille,
+                        "Nom": nom,
+                        "Club": club if club not in ["", "-", "None"] else "Indépendant",
+                        "Comité": comite,
+                        "Poids": poids_val,
+                        "Points": pts_val,
+                        "Clt_Excel": clt_val
+                    })
             r += 1
             
         if lutteurs_poule:
@@ -4474,12 +4547,17 @@ if mode_app.startswith("2"):
             points_comites = {}
 
             for _, row in df_bilan.iterrows():
+                nom = str(row.get("Nom", "")).strip()
                 club = str(row.get("Club", "")).strip()
                 comite = str(row.get("Comité", "Comité Non Renseigné")).strip()
                 if not comite or comite in ["None", "nan", "-"]:
                     comite = "Comité Non Renseigné"
                 
-                if club and club not in ["", "-", "None", "nan"] and club not in points_clubs:
+                # Exclusion des faux clubs (labels d'en-têtes ou poids)
+                if not club or club in ["", "-", "None", "nan", "CLUB", "Club", "Indépendant"] or "kg" in club.lower() or club.isdigit():
+                    continue
+                
+                if club not in points_clubs:
                     points_clubs[club] = {"Club": club, "Points Club": 0, "1ers": 0, "2èmes": 0, "3èmes": 0, "4èmes": 0}
                 if comite and comite not in points_comites:
                     points_comites[comite] = {"Comité Régional": comite, "Points Comité": 0, "1ers": 0, "2èmes": 0, "3èmes": 0, "4èmes": 0}
@@ -4777,33 +4855,35 @@ if mode_app.startswith("2"):
 
             st.markdown("---")
             st.markdown("### 📥 Téléchargements Complets du Tournoi (Formats Officiels FFLDA)")
-            col_bil_pdf, col_bil_xl = st.columns(2)
-            with col_bil_pdf:
-                st.download_button(
-                    label="📄 Télécharger le Dossier Officiel en PDF (A4 Portrait - Format Excel)",
-                    data=pdf_bytes_dossier_complet or pdf_bilan_only_bytes,
-                    file_name=f"Dossier_Officiel_Resultats_{nom_comp_officiel.replace(' ', '_')}.pdf",
-                    mime="application/pdf",
-                    key="btn_pdf_dossier_resultats"
-                )
-            with col_bil_xl:
-                st.download_button(
-                    label="📥 Télécharger le Classeur Officiel Excel (.xlsx)",
-                    data=excel_bytes_complet,
-                    file_name=f"Tournoi_Resultats_{nom_comp_officiel.replace(' ', '_')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="btn_excel_dossier_resultats"
-                )
-
-            if pdf_bilan_only_bytes:
-                with st.expander("📄 Télécharger uniquement les Bilans Généraux (Clubs, Comités & Podiums)"):
+            col_b1, col_b2, col_b3 = st.columns(3)
+            with col_b1:
+                if pdf_bilan_only_bytes:
                     st.download_button(
-                        label="📄 Télécharger uniquement les Bilans en PDF (A4 Portrait)",
+                        label="📄 Bilan Officiel PDF\n(Clubs, Comités & Podiums)",
                         data=pdf_bilan_only_bytes,
                         file_name=f"Bilan_Officiel_{nom_comp_officiel.replace(' ', '_')}.pdf",
                         mime="application/pdf",
-                        key="btn_pdf_bilan_seul"
+                        key="btn_pdf_bilan_seul",
+                        use_container_width=True
                     )
+            with col_b2:
+                st.download_button(
+                    label="📄 Dossier Officiel PDF\n(Tapis + Grilles + Bilans)",
+                    data=pdf_bytes_dossier_complet or pdf_bilan_only_bytes,
+                    file_name=f"Dossier_Officiel_Resultats_{nom_comp_officiel.replace(' ', '_')}.pdf",
+                    mime="application/pdf",
+                    key="btn_pdf_dossier_resultats",
+                    use_container_width=True
+                )
+            with col_b3:
+                st.download_button(
+                    label="📥 Classeur Officiel Excel\n(.xlsx Complété)",
+                    data=excel_bytes_complet,
+                    file_name=f"Tournoi_Resultats_{nom_comp_officiel.replace(' ', '_')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="btn_excel_dossier_resultats",
+                    use_container_width=True
+                )
 
         except Exception as e:
             st.error(f"Erreur lors de l'analyse du fichier : {e}")

@@ -91,9 +91,10 @@ def verifier_code_acces(code_saisi, url_csv):
 
 URL_BILLING_WEBHOOK_DEFAUT = "https://script.google.com/macros/s/AKfycbyaf4baLI9MY9aepr-JoY7WUwSk51FM_oFX-HiwlOOOBc0BSv5kBu0SQFfUaYEjcSow/exec"
 
-def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_peses, nb_matchs, prix_par_match=None):
+def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_peses, nb_matchs):
     """
-    Transmet silencieusement en arrière-plan les métriques de facturation vers le webhook Google Apps Script.
+    Transmet silencieusement en arrière-plan les métriques du tournoi vers Google Sheets.
+    La facturation et les formules sont gérées directement dans Google Sheets.
     """
     try:
         url_webhook = None
@@ -113,22 +114,13 @@ def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_
         except Exception:
             now_str = (datetime.utcnow() + timedelta(hours=2)).strftime("%d/%m/%Y %H:%M:%S")
             
-        if prix_par_match is None:
-            prix_par_match = float(st.session_state.get("prix_par_match", 1.00))
-            
-        n_matchs = int(nb_matchs or 0)
-        p_match = float(prix_par_match or 1.00)
-        p_total = round(n_matchs * p_match, 2)
-            
         payload = {
             "code_organisateur": str(code_organisateur or "ANONYME"),
             "nom_tournoi": str(nom_tournoi or "Tournoi sans nom"),
             "date": now_str,
             "total_inscrits": int(nb_inscrits or 0),
             "total_peses": int(nb_peses or 0),
-            "total_matchs": n_matchs,
-            "prix_par_match": f"{p_match:.2f}",
-            "prix_total": f"{p_total:.2f}"
+            "total_matchs": int(nb_matchs or 0)
         }
         
         data = urllib.parse.urlencode(payload).encode('utf-8')
@@ -159,8 +151,6 @@ if not st.session_state["authentifie"]:
             st.session_state["url_gsheets_config"] = url_gsheets_in
             url_billing_in = st.text_input("URL Webhook de facturation", value=st.session_state.get("url_billing_webhook", URL_BILLING_WEBHOOK_DEFAUT))
             st.session_state["url_billing_webhook"] = url_billing_in
-            prix_match_in = st.number_input("Tarif par match (€)", value=float(st.session_state.get("prix_par_match", 1.00)), min_value=0.0, step=0.10, format="%.2f")
-            st.session_state["prix_par_match"] = prix_match_in
         
         if st.button("🚀 Se Connecter", use_container_width=True):
             valide, message = verifier_code_acces(code_saisi, st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
@@ -234,6 +224,10 @@ with st.sidebar:
         duree_u9 = st.number_input("Temps total U9 (min)", value=3)
         duree_u11 = st.number_input("Temps total U11 (min)", value=4)
         duree_u13 = st.number_input("Temps total U13 (min)", value=5)
+
+    with st.expander("💳 4. Tarification & Facturation (Admin)", expanded=False):
+        prix_inscrit_in = st.number_input("Tarif par inscrit (€)", value=float(st.session_state.get("prix_par_inscrit", 0.50)), min_value=0.0, step=0.05, format="%.2f", key="sidebar_prix_par_inscrit")
+        st.session_state["prix_par_inscrit"] = prix_inscrit_in
 
     # JavaScript pour le comportement d'accordéon à ouverture unique (ferme les autres au clic)
     components.html("""

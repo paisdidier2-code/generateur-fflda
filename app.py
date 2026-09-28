@@ -4403,6 +4403,8 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         for r_search in range(1, min(15, ws.max_row + 1)):
             for c_idx in range(1, min(25, ws.max_column + 1)):
                 val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
+                if any(k in val_h for k in ["compétition", "competition", "tournoi", "formule", "phase", "rencontres", "planning", "grille", "tapis", "déroulement", "deroulement", "programme"]) or " — " in str(ws.cell(row=r_search, column=c_idx).value or ""):
+                    continue
                 if any(k in val_h for k in ["nom", "prénom", "prenom", "lutteur", "athlete"]):
                     col_nom = c_idx
                     h_row = r_search

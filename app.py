@@ -4124,6 +4124,24 @@ def bouton_imprimer(html_data=None, filename="Fiche_Impression_Paysage.html", la
         """
         components.html(print_code, height=50)
 
+def nettoyer_rang(val):
+    """Extrait le rang numérique sous forme d'entier (1, 2, 3...) ou 'NR'."""
+    if val is None:
+        return "NR"
+    s = str(val).strip()
+    if not s or s in ["NR", "None", "nan", "<NA>", "NoneType", "-", "0"]:
+        return "NR"
+    try:
+        v_num = int(float(s))
+        return v_num if v_num > 0 else "NR"
+    except (ValueError, TypeError):
+        pass
+    m = re.search(r'(\d+)', s)
+    if m:
+        v_num = int(m.group(1))
+        return v_num if v_num > 0 else "NR"
+    return "NR"
+
 def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
     """
     Extrait l'intégralité des résultats et classements officiels directement depuis le classeur Excel
@@ -4432,10 +4450,8 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     pts_val = determiner_points_lutteur(ws, ws_f, r, col_total_pts, col_start_t=5, h_row=h_row)
                     
                     clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
-                    try:
-                        clt_val = int(float(str(clt_raw).strip())) if clt_raw is not None and str(clt_raw).strip() not in ['', 'NR', 'None', '-'] else None
-                    except (ValueError, TypeError):
-                        clt_val = None
+                    clt_cleaned = nettoyer_rang(clt_raw)
+                    clt_val = clt_cleaned if isinstance(clt_cleaned, int) else None
 
                     # Recherche dans les cartes podium si disponible
                     if clt_val is None and podium_cards:
@@ -4496,100 +4512,146 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     
             tous_les_resultats.extend(lutteurs_poule)
 
-    # Fallback : Si aucun résultat n'a été trouvé dans les onglets de poules,
-    # ou si le fichier contient un onglet de bilan individuel (ex: "Classements Individuels", "Bilan", "Classement Général")
-    if not tous_les_resultats:
-        def extraire_depuis_feuille_classement_individuel(ws_target, ws_form=None):
-            results = []
-            h_row = None
-            col_clt, col_nom, col_club, col_comite, col_poids, col_poule, col_pts = 1, 2, 3, None, None, None, None
-            
-            for r_s in range(1, min(15, ws_target.max_row + 1)):
-                for c_i in range(1, min(20, ws_target.max_column + 1)):
-                    v_h = str(ws_target.cell(row=r_s, column=c_i).value or "").strip().lower()
-                    if any(k in v_h for k in ["clt", "rang", "place"]):
-                        col_clt = c_i
-                        h_row = r_s
-                    elif any(k in v_h for k in ["nom", "prénom", "prenom", "lutteur"]):
-                        col_nom = c_i
-                        h_row = r_s
-                    elif "club" in v_h:
-                        col_club = c_i
-                    elif any(k in v_h for k in ["comité", "comite", "ligue"]):
-                        col_comite = c_i
-                    elif "poids" in v_h:
-                        col_poids = c_i
-                    elif any(k in v_h for k in ["poule", "catégorie", "categorie", "groupe"]):
-                        col_poule = c_i
-                    elif any(k in v_h for k in ["pts", "points", "total"]):
-                        col_pts = c_i
-                if col_nom and h_row:
-                    break
-
-            if not h_row:
-                return results
-
-            current_poule = ws_target.title
-            r = h_row + 1
-            while r <= ws_target.max_row:
-                nom_raw = ws_target.cell(row=r, column=col_nom).value
-                if nom_raw is None and r > h_row + 50:
-                    break
-                if nom_raw is not None:
-                    nom = str(nom_raw).strip()
-                    club = str(ws_target.cell(row=r, column=col_club).value or "Indépendant").strip() if col_club else "Indépendant"
+    # Toujours rechercher si un onglet récapitulatif ("Classements Individuels", "Bilan", "Classement Général") existe
+    def extraire_depuis_feuille_classement_individuel(ws_target, ws_form=None):
+        results = []
+        h_row = None
+        
+        for r_s in range(1, min(15, ws_target.max_row + 1)):
+            c_nom_found, c_clt_found, c_club_found = None, None, None
+            for c_i in range(1, min(20, ws_target.max_column + 1)):
+                v_h = str(ws_target.cell(row=r_s, column=c_i).value or "").strip().lower()
+                if any(k in v_h for k in ["nom", "prénom", "prenom", "lutteur"]) and "catégorie" not in v_h and "poule" not in v_h:
+                    c_nom_found = c_i
+                elif any(k in v_h for k in ["clt", "rang", "place"]):
+                    c_clt_found = c_i
+                elif "club" in v_h:
+                    c_club_found = c_i
                     
-                    nom_l = nom.lower()
-                    if any(k in nom_l for k in ["poule", "catégorie", "categorie", "kg", "u7", "u9", "u11", "u13"]):
-                        if not est_ligne_lutteur_valide(nom, club):
-                            current_poule = nom
-                            r += 1
-                            continue
-                    
-                    if est_ligne_lutteur_valide(nom, club):
-                        clt_raw = ws_target.cell(row=r, column=col_clt).value if col_clt else None
-                        try:
-                            clt_val = int(float(str(clt_raw).strip())) if clt_raw is not None and str(clt_raw).strip() not in ['', 'NR', 'None', '-'] else "NR"
-                        except (ValueError, TypeError):
-                            clt_val = "NR"
-                        
-                        poule_val = str(ws_target.cell(row=r, column=col_poule).value or "").strip() if col_poule else ""
-                        if not poule_val or poule_val in ["None", "nan", "-"]:
-                            poule_val = current_poule
-                        
-                        comite_val = str(ws_target.cell(row=r, column=col_comite).value or "").strip() if col_comite else "Comité Non Renseigné"
-                        if not comite_val or comite_val in ["None", "nan", "-"]:
-                            comite_val = "Comité Non Renseigné"
+            if c_nom_found and (c_clt_found or c_club_found):
+                h_row = r_s
+                break
 
-                        poids_val = formater_poids_local(ws_target.cell(row=r, column=col_poids).value) if col_poids else ""
-                        
-                        pts_val = 0
-                        if col_pts:
-                            pts_val = determiner_points_lutteur(ws_target, ws_form, r, col_pts, col_start_t=5, h_row=h_row)
-
-                        results.append({
-                            "Poule": poule_val,
-                            "Nom": nom,
-                            "Club": club if club not in ["", "-", "None"] else "Indépendant",
-                            "Comité": comite_val,
-                            "Poids": poids_val,
-                            "Points": pts_val,
-                            "Clt": clt_val
-                        })
-                r += 1
-
+        if not h_row:
             return results
 
-        for s_name in wb_data.sheetnames:
-            s_lower = s_name.lower()
-            if any(k in s_lower for k in ["classement", "individuel", "bilan", "résultat", "resultat", "général", "general"]):
-                if not any(k in s_lower for k in ["club", "comité", "comite"]):
-                    res_summary = extraire_depuis_feuille_classement_individuel(wb_data[s_name], wb_formula[s_name] if (wb_formula and s_name in wb_formula.sheetnames) else None)
-                    if res_summary:
-                        tous_les_resultats.extend(res_summary)
-                        break
+        col_clt, col_nom, col_club, col_comite, col_poids, col_pts = None, None, None, None, None, None
+        for c_i in range(1, min(20, ws_target.max_column + 1)):
+            v_h = str(ws_target.cell(row=h_row, column=c_i).value or "").strip().lower()
+            if any(k in v_h for k in ["clt", "rang", "place"]):
+                col_clt = c_i
+            elif any(k in v_h for k in ["nom", "prénom", "prenom", "lutteur"]):
+                col_nom = c_i
+            elif "club" in v_h:
+                col_club = c_i
+            elif any(k in v_h for k in ["comité", "comite", "ligue"]):
+                col_comite = c_i
+            elif "poids" in v_h:
+                col_poids = c_i
+            elif any(k in v_h for k in ["pts", "points", "total"]):
+                col_pts = c_i
+
+        current_poule = ws_target.title
+        for r_pre in range(1, h_row):
+            v_pre = str(ws_target.cell(row=r_pre, column=1).value or "").strip()
+            if any(k in v_pre.lower() for k in ["poule", "catégorie", "categorie"]):
+                current_poule = re.sub(r'^\s*catégorie\s*/\s*poule\s*:\s*', '', v_pre, flags=re.IGNORECASE).strip()
+
+        r = h_row + 1
+        while r <= ws_target.max_row:
+            v_cell1 = str(ws_target.cell(row=r, column=1).value or "").strip()
+            if any(k in v_cell1.lower() for k in ["poule", "catégorie", "categorie"]):
+                if not est_ligne_lutteur_valide(v_cell1, ""):
+                    current_poule = re.sub(r'^\s*catégorie\s*/\s*poule\s*:\s*', '', v_cell1, flags=re.IGNORECASE).strip()
+                    r += 1
+                    continue
+
+            nom_raw = ws_target.cell(row=r, column=col_nom).value if col_nom else None
+            if nom_raw is not None:
+                nom = str(nom_raw).strip()
+                club = str(ws_target.cell(row=r, column=col_club).value or "Indépendant").strip() if col_club else "Indépendant"
+                if est_ligne_lutteur_valide(nom, club):
+                    clt_raw = ws_target.cell(row=r, column=col_clt).value if col_clt else None
+                    clt_val = nettoyer_rang(clt_raw)
+                    
+                    comite_val = str(ws_target.cell(row=r, column=col_comite).value or "").strip() if col_comite else "Comité Non Renseigné"
+                    if not comite_val or comite_val in ["None", "nan", "-"]:
+                        comite_val = "Comité Non Renseigné"
+
+                    poids_val = formater_poids_local(ws_target.cell(row=r, column=col_poids).value) if col_poids else ""
+                    
+                    pts_val = 0
+                    if col_pts:
+                        pts_val = determiner_points_lutteur(ws_target, ws_form, r, col_pts, col_start_t=5, h_row=h_row)
+
+                    results.append({
+                        "Poule": current_poule,
+                        "Nom": nom,
+                        "Club": club if club not in ["", "-", "None"] else "Indépendant",
+                        "Comité": comite_val,
+                        "Poids": poids_val,
+                        "Points": pts_val,
+                        "Clt": clt_val
+                    })
+            r += 1
+
+        return results
+
+    summary_results = []
+    for s_name in wb_data.sheetnames:
+        s_lower = s_name.lower()
+        if any(k in s_lower for k in ["classement", "individuel", "bilan", "résultat", "resultat", "général", "general"]):
+            if not any(k in s_lower for k in ["club", "comité", "comite"]):
+                res_sum = extraire_depuis_feuille_classement_individuel(wb_data[s_name], wb_formula[s_name] if (wb_formula and s_name in wb_formula.sheetnames) else None)
+                if res_sum:
+                    summary_results = res_sum
+                    break
+
+    if not tous_les_resultats:
+        tous_les_resultats = summary_results
+    elif summary_results:
+        # Fusionner / enrichir avec les rangs explicites de la feuille récapitulative
+        map_summary = {}
+        for r_s in summary_results:
+            k_name = normaliser_nom_comparaison(r_s.get("Nom", ""))
+            if k_name:
+                map_summary[k_name] = r_s
+
+        for r_p in tous_les_resultats:
+            k_p = normaliser_nom_comparaison(r_p.get("Nom", ""))
+            if k_p in map_summary:
+                s_item = map_summary[k_p]
+                s_clt = nettoyer_rang(s_item.get("Clt"))
+                if s_clt != "NR":
+                    r_p["Clt"] = s_clt
+                if s_item.get("Points", 0) > 0 and r_p.get("Points", 0) == 0:
+                    r_p["Points"] = s_item["Points"]
 
     return tous_les_resultats
+
+
+def trier_dataframe_bilan(df):
+    """Trie numériquement le dataframe de bilan par Poule, puis par Rang (1er, 2ème, 3ème...), puis Points."""
+    if df is None or df.empty:
+        return df
+    
+    def key_clt(v):
+        r_clean = nettoyer_rang(v)
+        if isinstance(r_clean, int):
+            return (0, r_clean)
+        else:
+            return (2, 999)
+
+    df_copy = df.copy()
+    df_copy["_sort_clt"] = df_copy["Clt"].apply(key_clt)
+    df_copy["_sort_pts"] = pd.to_numeric(df_copy["Points"], errors="coerce").fillna(0)
+    
+    df_sorted = df_copy.sort_values(
+        by=["Poule", "_sort_clt", "_sort_pts"], 
+        ascending=[True, True, False]
+    ).drop(columns=["_sort_clt", "_sort_pts"]).reset_index(drop=True)
+    
+    return df_sorted
 
 
 # Sélection du mode de travail
@@ -4633,12 +4695,14 @@ if mode_app.startswith("2"):
             df_bilan = pd.DataFrame(tous_les_resultats)
             if not df_bilan.empty:
                 if "Clt" in df_bilan.columns:
-                    df_bilan["Clt"] = df_bilan["Clt"].astype(str).replace(["None", "nan", "NoneType", "<NA>"], "NR")
+                    df_bilan["Clt"] = df_bilan["Clt"].apply(lambda v: str(nettoyer_rang(v)))
                 if "Points" in df_bilan.columns:
                     df_bilan["Points"] = pd.to_numeric(df_bilan["Points"], errors="coerce").fillna(0).astype(int)
                 for col_str in ["Nom", "Club", "Comité", "Poids", "Poule"]:
                     if col_str in df_bilan.columns:
                         df_bilan[col_str] = df_bilan[col_str].astype(str).replace(["None", "nan"], "")
+                # Tri numérique par Poule, Clt (1er, 2ème, 3ème...) et Points
+                df_bilan = trier_dataframe_bilan(df_bilan)
             
             # Transmettre silencieusement les résultats et métriques du bilan au Webhook Facturation
             try:
@@ -4695,11 +4759,11 @@ if mode_app.startswith("2"):
                 if comite and comite not in points_comites:
                     points_comites[comite] = {"Comité Régional": comite, "Points Comité": 0, "1ers": 0, "2èmes": 0, "3èmes": 0, "4èmes": 0}
                 
-                clt = str(row.get("Clt", "NR")).strip()
-                if clt == "NR" or not clt.isdigit():
+                clt_val = nettoyer_rang(row.get("Clt"))
+                if clt_val == "NR" or not isinstance(clt_val, int):
                     continue
                 
-                clt_num = int(clt)
+                clt_num = clt_val
                 is_u7_poule = "u7" in str(row.get("Poule", "")).lower()
                 pts_attribués = 1 if is_u7_poule else bareme_points.get(clt_num, 0)
                 

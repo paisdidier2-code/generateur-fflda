@@ -4129,10 +4129,11 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
     Extrait l'intégralité des résultats et classements officiels directement depuis le classeur Excel
     fourni par l'utilisateur (format officiel FFLDA).
     Gère les Poules Nordiques, Tableaux à élimination directe U13, Poules Croisées et Plateaux U7.
+    Extrait et calcule fidèlement les points de victoires et classements y compris en cas de formules non recalculées.
     """
     tous_les_resultats = []
     
-    # Filtrer les onglets de compétition (exclure Résumé, Grille de passage, et feuilles de bilan préexistantes)
+    # Filtrer les onglets de compétition
     onglets_poules = [
         f for f in wb_data.sheetnames 
         if not any(x in f.lower() for x in ["résumé", "resume", "grille", "classement clubs", "classement comités", "classements individuels", "classement général", "bilan"])
@@ -4176,8 +4177,30 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             return False
         return True
 
+    def extraire_texte_podium(v_data, v_form, ws_target):
+        txt_data = str(v_data or "").strip()
+        if txt_data and not txt_data.startswith("=") and txt_data not in ["None", "nan"]:
+            return txt_data
+        txt_form = str(v_form or "").strip()
+        if not txt_form or txt_form in ["None", "nan"]:
+            return ""
+        m_refs = re.findall(r'([A-Z]+[0-9]+)', txt_form)
+        parts = []
+        literals = re.findall(r'"([^"]*)"', txt_form)
+        if literals:
+            parts.extend(literals)
+        for cell_ref in m_refs:
+            try:
+                val_ref = str(ws_target[cell_ref].value or "").strip()
+                if val_ref and not val_ref.startswith("="):
+                    parts.append(val_ref)
+            except Exception:
+                pass
+        return " ".join(parts) if parts else txt_form
+
     for nom_feuille in onglets_poules:
         ws = wb_data[nom_feuille]
+        ws_f = wb_formula[nom_feuille] if (wb_formula and nom_feuille in wb_formula.sheetnames) else None
         
         titre_feuille = ""
         for r_t in range(1, 4):
@@ -4236,7 +4259,9 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             podium_croisees = {}
             for r_c in range(1, min(ws.max_row + 1, 30)):
                 for c_c in range(1, min(ws.max_column + 1, 25)):
-                    v_cell = str(ws.cell(row=r_c, column=c_c).value or "").strip()
+                    v_cell_data = ws.cell(row=r_c, column=c_c).value
+                    v_cell_form = ws_f.cell(row=r_c, column=c_c).value if ws_f else None
+                    v_cell = extraire_texte_podium(v_cell_data, v_cell_form, ws)
                     if "🥇" in v_cell or "OR" in v_cell:
                         podium_croisees[1] = v_cell
                     elif "🥈" in v_cell or "ARGENT" in v_cell:
@@ -4349,9 +4374,9 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             podium_tableau = {}
             for r_c in range(1, min(ws.max_row + 1, 60)):
                 for c_c in range(5, min(ws.max_column + 1, 40)):
-                    v_cell = str(ws.cell(row=r_c, column=c_c).value or "").strip()
-                    if not v_cell or v_cell.startswith("="):
-                        continue
+                    v_cell_data = ws.cell(row=r_c, column=c_c).value
+                    v_cell_form = ws_f.cell(row=r_c, column=c_c).value if ws_f else None
+                    v_cell = extraire_texte_podium(v_cell_data, v_cell_form, ws)
                     if "🥇" in v_cell or "CHAMPION (OR)" in v_cell:
                         podium_tableau[1] = v_cell
                     elif "🥈" in v_cell or "VICE-CHAMPION" in v_cell:
@@ -4402,22 +4427,22 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         col_total_pts = None
         col_poids = None
         
-        for r_search in [4, 5, 3]:
+        for r_search in [4, 5, 3, 2, 6]:
             for c_idx in range(1, ws.max_column + 1):
                 val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
-                if "clt" in val_h or "rang" in val_h:
+                if any(k in val_h for k in ["clt", "rang", "classt", "classement", "place"]):
                     col_clt = c_idx
                     h_row = r_search
-                elif "nom" in val_h:
+                elif any(k in val_h for k in ["nom", "prénom", "prenom", "lutteur", "athlete", "athléte"]):
                     col_nom = c_idx
                     h_row = r_search
-                elif "club" in val_h:
+                elif any(k in val_h for k in ["club", "équipe", "equipe"]):
                     col_club = c_idx
-                elif any(k in val_h for k in ["comité", "comite", "ligue", "région", "region", "c.r."]):
+                elif any(k in val_h for k in ["comité", "comite", "ligue", "région", "region", "c.r.", "cr"]):
                     col_comite = c_idx
-                elif "total pts" in val_h or val_h == "pts":
+                elif any(k in val_h for k in ["total pts", "total points", "pts total", "points total", "pts clt", "pts classt", "tot pts", "pts", "points"]):
                     col_total_pts = c_idx
-                elif "poids" in val_h:
+                elif any(k in val_h for k in ["poids", "kg"]):
                     col_poids = c_idx
             if col_nom and (col_total_pts or col_club):
                 break
@@ -4436,14 +4461,35 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     comite_val = ws.cell(row=r, column=col_comite).value if col_comite else None
                     comite = str(comite_val).strip() if (comite_val and str(comite_val).strip() not in ["", "None", "nan", "-"]) else "Comité Non Renseigné"
                     
-                    total_pts = ws.cell(row=r, column=col_total_pts).value if col_total_pts else 0
                     poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
                     poids_val = formater_poids_local(poids_raw)
                     
-                    try:
-                        pts_val = int(round(float(total_pts))) if total_pts is not None else 0
-                    except (ValueError, TypeError):
-                        pts_val = 0
+                    pts_val = 0
+                    if col_total_pts:
+                        total_pts_raw = ws.cell(row=r, column=col_total_pts).value
+                        try:
+                            if total_pts_raw is not None and str(total_pts_raw).strip() not in ['', 'None', 'nan', '-']:
+                                pts_val = int(round(float(str(total_pts_raw).strip())))
+                        except (ValueError, TypeError):
+                            pts_val = 0
+                    
+                    # Fallback : Si Total Pts est 0 ou non évalué, sommer les colonnes des tours
+                    if pts_val == 0:
+                        sum_tours = 0
+                        found_tours = False
+                        col_start_tours = 6
+                        col_end_tours = col_total_pts if col_total_pts else (ws.max_column + 1)
+                        for col_t in range(col_start_tours, col_end_tours):
+                            val_t_c = ws.cell(row=r, column=col_t).value
+                            try:
+                                if val_t_c is not None and str(val_t_c).strip() not in ['', 'None', 'nan', '-']:
+                                    v_num = float(str(val_t_c).strip())
+                                    sum_tours += v_num
+                                    found_tours = True
+                            except (ValueError, TypeError):
+                                pass
+                        if found_tours:
+                            pts_val = int(round(sum_tours))
                     
                     clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
                     try:

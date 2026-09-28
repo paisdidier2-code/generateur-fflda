@@ -89,7 +89,7 @@ def verifier_code_acces(code_saisi, url_csv):
     except Exception as e:
         return False, f"⚠️ Erreur lors de la vérification du code : {e}"
 
-URL_BILLING_WEBHOOK_DEFAUT = "https://script.google.com/macros/s/AKfycbyxLjHY-YXzT8ZAYdKpM-JmWD42SwlyVL3Dn_VX-HgT6M1qHidVL5iLmM7JF2T7Fi5P/exec"
+URL_BILLING_WEBHOOK_DEFAUT = "https://script.google.com/macros/s/AKfycbyaf4baLI9MY9aepr-JoY7WUwSk51FM_oFX-HiwlOOOBc0BSv5kBu0SQFfUaYEjcSow/exec"
 
 def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_peses, nb_matchs, prix_par_match=None):
     """

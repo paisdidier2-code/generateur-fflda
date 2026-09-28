@@ -4841,13 +4841,44 @@ else:
             elif "Age" not in df_raw.columns:
                 df_raw["Age"] = ""
 
-            # 2. Club / Sigle du Club
+            # 2. Club / Sigle du Club (Priorité absolue au Sigle du club)
             club_col_found = None
+            
+            # Priorité 1 : Sigle du club / Sigle club / Sigle
             for col_name in df_raw.columns:
-                col_str = str(col_name).strip().lower()
-                if any(k in col_str for k in ["sigle du club", "sigle club", "club", "équipe", "equipe", "structure"]):
+                col_lower = str(col_name).strip().lower()
+                if any(k in col_lower for k in ["sigle du club", "sigle club", "sigle_club", "sigle"]):
                     club_col_found = col_name
                     break
+
+            # Priorité 2 : Nom du club / Libellé club / Nom structure (en excluant N°, Num, Code, ID)
+            if not club_col_found:
+                for col_name in df_raw.columns:
+                    col_lower = str(col_name).strip().lower()
+                    if any(n in col_lower for n in ["n°", "num", "code", "id", "numéro", "numero"]):
+                        continue
+                    if any(k in col_lower for k in ["nom du club", "nom club", "libellé club", "libelle club", "nom structure", "club nom", "nom_club"]):
+                        club_col_found = col_name
+                        break
+                        
+            # Priorité 3 : colonne simplement "club", "structure", "équipe", "equipe" (sans n°/code/id)
+            if not club_col_found:
+                for col_name in df_raw.columns:
+                    col_lower = str(col_name).strip().lower()
+                    if any(n in col_lower for n in ["n°", "num", "code", "id", "numéro", "numero"]):
+                        continue
+                    if any(k in col_lower for k in ["club", "équipe", "equipe", "structure"]):
+                        club_col_found = col_name
+                        break
+
+            # Fallback Priorité 4 : n'importe quelle colonne contenant "club" ou "structure"
+            if not club_col_found:
+                for col_name in df_raw.columns:
+                    col_lower = str(col_name).strip().lower()
+                    if "club" in col_lower or "structure" in col_lower:
+                        club_col_found = col_name
+                        break
+
             if club_col_found:
                 df_raw = df_raw.rename(columns={club_col_found: "Club"})
             elif "Club" not in df_raw.columns:

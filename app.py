@@ -3481,8 +3481,18 @@ def generer_pdf_depuis_classeur_excel(workbook_or_sheets, nom_competition="Tourn
                     return q
         return ""
 
-    def clean_val(val, current_ws):
-        if val is None:
+    def clean_val(val, current_ws, row=None, col=None):
+        if val is None or val == "":
+            if row is not None and col is not None and wb_ref is not None:
+                try:
+                    s_name = current_ws.title
+                    if hasattr(wb_ref, 'sheetnames') and s_name in wb_ref.sheetnames:
+                        ref_cell = wb_ref[s_name].cell(row=row, column=col)
+                        f_val = getattr(ref_cell, 'value', None)
+                        if f_val and str(f_val).strip().startswith('='):
+                            return resolve_formula_cell(f_val, current_ws, wb_ref)
+                except Exception:
+                    pass
             return ""
         s = str(val).strip()
         if s.startswith('='):
@@ -3560,7 +3570,7 @@ def generer_pdf_depuis_classeur_excel(workbook_or_sheets, nom_competition="Tourn
             for c in range(1, max_c + 1):
                 cell = ws.cell(row=r, column=c)
                 raw = cell.value
-                txt = clean_val(raw, ws)
+                txt = clean_val(raw, ws, row=r, col=c)
                 
                 font = cell.font
                 is_bold = bool(font.bold) if font else False
@@ -4372,181 +4382,220 @@ if mode_app.startswith("2"):
                 st.markdown("*Barème officiel FFLDA : 1er = 4 pts | 2ème = 3 pts | 3ème = 2 pts | 4ème = 1 pt*")
                 st.table(df_comites)
 
-            output_bilan = io.BytesIO()
-            with pd.ExcelWriter(output_bilan, engine='openpyxl') as writer:
-                df_clubs.to_excel(writer, sheet_name="Classement Clubs", index=False, startrow=5)
-                df_comites.to_excel(writer, sheet_name="Classement Comités", index=False, startrow=5)
-                ws_indiv = writer.book.create_sheet("Classements Individuels")
-                
-                bleu_fflda = PatternFill("solid", fgColor="0055A4")
-                rouge_fflda = PatternFill("solid", fgColor="EF4135")
-                gris_zebrage = PatternFill("solid", fgColor="F2F5F8")
-                fond_blanc = PatternFill("solid", fgColor="FFFFFF")
-                or_fill = PatternFill("solid", fgColor="FFF2CC")
-                argent_fill = PatternFill("solid", fgColor="EFEFEF")
-                bronze_fill = PatternFill("solid", fgColor="F8CBAD")
-                
-                font_titre = Font(name="Arial", size=15, bold=True, color="0055A4")
-                font_section = Font(name="Arial", size=12, bold=True, color="FFFFFF")
-                font_entete = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-                font_data = Font(name="Arial", size=11, color="000000")
-                font_data_bold = Font(name="Arial", size=11, bold=True, color="0055A4")
-                b_fin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), 
-                               top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
-                
-                # Feuille Classement Clubs
-                ws_clubs = writer.sheets["Classement Clubs"]
-                ws_clubs.views.sheetView[0].showGridLines = True
-                ws_clubs.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
-                ws_clubs.cell(row=2, column=1, value="🛡️ CLASSEMENT OFFICIEL DES CLUBS - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
-                ws_clubs.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
-                
-                for col_idx in range(1, len(df_clubs.columns) + 1):
-                    cell = ws_clubs.cell(row=5, column=col_idx)
-                    cell.fill, cell.font, cell.alignment = bleu_fflda, font_entete, Alignment(horizontal="center", vertical="center")
-                    ws_clubs.row_dimensions[5].height = 25
-                
-                for row_idx in range(6, ws_clubs.max_row + 1):
-                    ws_clubs.row_dimensions[row_idx].height = 22
-                    is_even = (row_idx % 2 == 0)
-                    for col_idx in range(1, len(df_clubs.columns) + 1):
-                        cell = ws_clubs.cell(row=row_idx, column=col_idx)
-                        cell.border, cell.font = b_fin, font_data
-                        cell.fill = gris_zebrage if is_even else fond_blanc
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Intégration des feuilles officielles de Bilan directement dans le classeur Excel officiel
+            if "Classement Clubs" in wb_res.sheetnames:
+                del wb_res["Classement Clubs"]
+            ws_clubs = wb_res.create_sheet("Classement Clubs")
 
-                ws_clubs.column_dimensions['A'].width = 12
-                ws_clubs.column_dimensions['B'].width = 30
-                ws_clubs.column_dimensions['C'].width = 15
-                ws_clubs.column_dimensions['D'].width = 12
-                ws_clubs.column_dimensions['E'].width = 12
-                ws_clubs.column_dimensions['F'].width = 12
-                ws_clubs.column_dimensions['G'].width = 12
+            if "Classement Comités" in wb_res.sheetnames:
+                del wb_res["Classement Comités"]
+            ws_comites = wb_res.create_sheet("Classement Comités")
 
-                # Feuille Classement Comités Régionaux
-                ws_comites = writer.sheets["Classement Comités"]
-                ws_comites.views.sheetView[0].showGridLines = True
-                ws_comites.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
-                ws_comites.cell(row=2, column=1, value="🏛️ CLASSEMENT OFFICIEL DES COMITÉS RÉGIONAUX - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
-                ws_comites.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
-                
-                for col_idx in range(1, len(df_comites.columns) + 1):
-                    cell = ws_comites.cell(row=5, column=col_idx)
-                    cell.fill, cell.font, cell.alignment = bleu_fflda, font_entete, Alignment(horizontal="center", vertical="center")
-                    ws_comites.row_dimensions[5].height = 25
-                
-                for row_idx in range(6, ws_comites.max_row + 1):
-                    ws_comites.row_dimensions[row_idx].height = 22
-                    is_even = (row_idx % 2 == 0)
-                    for col_idx in range(1, len(df_comites.columns) + 1):
-                        cell = ws_comites.cell(row=row_idx, column=col_idx)
-                        cell.border, cell.font = b_fin, font_data
-                        cell.fill = gris_zebrage if is_even else fond_blanc
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
+            if "Classements Individuels" in wb_res.sheetnames:
+                del wb_res["Classements Individuels"]
+            ws_indiv = wb_res.create_sheet("Classements Individuels")
 
-                ws_comites.column_dimensions['A'].width = 12
-                ws_comites.column_dimensions['B'].width = 30
-                ws_comites.column_dimensions['C'].width = 15
-                ws_comites.column_dimensions['D'].width = 12
-                ws_comites.column_dimensions['E'].width = 12
-                ws_comites.column_dimensions['F'].width = 12
-                ws_comites.column_dimensions['G'].width = 12
+            bleu_fflda = PatternFill("solid", fgColor="0055A4")
+            rouge_fflda = PatternFill("solid", fgColor="EF4135")
+            gris_zebrage = PatternFill("solid", fgColor="F2F5F8")
+            fond_blanc = PatternFill("solid", fgColor="FFFFFF")
+            or_fill = PatternFill("solid", fgColor="FFF2CC")
+            argent_fill = PatternFill("solid", fgColor="EFEFEF")
+            bronze_fill = PatternFill("solid", fgColor="F8CBAD")
+            
+            font_titre = Font(name="Arial", size=15, bold=True, color="0055A4")
+            font_section = Font(name="Arial", size=12, bold=True, color="FFFFFF")
+            font_entete = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+            font_data = Font(name="Arial", size=11, color="000000")
+            font_data_bold = Font(name="Arial", size=11, bold=True, color="0055A4")
+            b_fin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), 
+                           top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+            
+            # 1. Feuille Classement Clubs
+            ws_clubs.views.sheetView[0].showGridLines = True
+            ws_clubs.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
+            ws_clubs.cell(row=2, column=1, value="🛡️ CLASSEMENT OFFICIEL DES CLUBS - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
+            ws_clubs.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
+            
+            for col_idx, col_name in enumerate(df_clubs.columns, 1):
+                cell = ws_clubs.cell(row=5, column=col_idx, value=col_name)
+                cell.fill, cell.font, cell.alignment = bleu_fflda, font_entete, Alignment(horizontal="center", vertical="center")
+            ws_clubs.row_dimensions[5].height = 25
+            
+            for r_offset, r_data in enumerate(df_clubs.values, 6):
+                ws_clubs.row_dimensions[r_offset].height = 22
+                is_even = (r_offset % 2 == 0)
+                for c_offset, val in enumerate(r_data, 1):
+                    cell = ws_clubs.cell(row=r_offset, column=c_offset, value=val)
+                    cell.border, cell.font = b_fin, font_data
+                    cell.fill = gris_zebrage if is_even else fond_blanc
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
 
-                ws_indiv.views.sheetView[0].showGridLines = True
-                ws_indiv.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
-                ws_indiv.cell(row=2, column=1, value="🏆 CLASSEMENTS INDIVIDUELS OFFICIELS - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
-                ws_indiv.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
+            ws_clubs.column_dimensions['A'].width = 12
+            ws_clubs.column_dimensions['B'].width = 30
+            ws_clubs.column_dimensions['C'].width = 15
+            ws_clubs.column_dimensions['D'].width = 12
+            ws_clubs.column_dimensions['E'].width = 12
+            ws_clubs.column_dimensions['F'].width = 12
+            ws_clubs.column_dimensions['G'].width = 12
+
+            # 2. Feuille Classement Comités Régionaux
+            ws_comites.views.sheetView[0].showGridLines = True
+            ws_comites.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
+            ws_comites.cell(row=2, column=1, value="🏛️ CLASSEMENT OFFICIEL DES COMITÉS RÉGIONAUX - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
+            ws_comites.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
+            
+            for col_idx, col_name in enumerate(df_comites.columns, 1):
+                cell = ws_comites.cell(row=5, column=col_idx, value=col_name)
+                cell.fill, cell.font, cell.alignment = bleu_fflda, font_entete, Alignment(horizontal="center", vertical="center")
+            ws_comites.row_dimensions[5].height = 25
+            
+            for r_offset, r_data in enumerate(df_comites.values, 6):
+                ws_comites.row_dimensions[r_offset].height = 22
+                is_even = (r_offset % 2 == 0)
+                for c_offset, val in enumerate(r_data, 1):
+                    cell = ws_comites.cell(row=r_offset, column=c_offset, value=val)
+                    cell.border, cell.font = b_fin, font_data
+                    cell.fill = gris_zebrage if is_even else fond_blanc
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            ws_comites.column_dimensions['A'].width = 12
+            ws_comites.column_dimensions['B'].width = 30
+            ws_comites.column_dimensions['C'].width = 15
+            ws_comites.column_dimensions['D'].width = 12
+            ws_comites.column_dimensions['E'].width = 12
+            ws_comites.column_dimensions['F'].width = 12
+            ws_comites.column_dimensions['G'].width = 12
+
+            # 3. Feuille Classements Individuels
+            ws_indiv.views.sheetView[0].showGridLines = True
+            ws_indiv.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
+            ws_indiv.cell(row=2, column=1, value="🏆 CLASSEMENTS INDIVIDUELS OFFICIELS - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
+            ws_indiv.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
+            
+            row_cursor = 5
+            headers_indiv = ["Clt", "NOM Prénom", "CLUB", "POIDS (kg)", "POINTS"]
+            
+            for poule in df_bilan['Poule'].unique():
+                groupe = df_bilan[df_bilan['Poule'] == poule]
+                ws_indiv.merge_cells(start_row=row_cursor, start_column=1, end_row=row_cursor, end_column=5)
+                cell_cat = ws_indiv.cell(row=row_cursor, column=1, value=f"  CATÉGORIE / POULE : {poule}")
+                cell_cat.fill, cell_cat.font, cell_cat.alignment = bleu_fflda, font_section, Alignment(horizontal="left", vertical="center")
+                ws_indiv.row_dimensions[row_cursor].height = 28
+                row_cursor += 1
                 
-                row_cursor = 5
-                headers_indiv = ["Clt", "NOM Prénom", "CLUB", "POIDS (kg)", "POINTS"]
+                for col_idx, h in enumerate(headers_indiv, 1):
+                    cell = ws_indiv.cell(row=row_cursor, column=col_idx, value=h)
+                    cell.fill, cell.font, cell.alignment = rouge_fflda, font_entete, Alignment(horizontal="center", vertical="center")
+                    ws_indiv.row_dimensions[row_cursor].height = 22
+                row_cursor += 1
                 
-                for poule in df_bilan['Poule'].unique():
-                    groupe = df_bilan[df_bilan['Poule'] == poule]
-                    ws_indiv.merge_cells(start_row=row_cursor, start_column=1, end_row=row_cursor, end_column=5)
-                    cell_cat = ws_indiv.cell(row=row_cursor, column=1, value=f"  CATÉGORIE / POULE : {poule}")
-                    cell_cat.fill, cell_cat.font, cell_cat.alignment = bleu_fflda, font_section, Alignment(horizontal="left", vertical="center")
-                    ws_indiv.row_dimensions[row_cursor].height = 28
-                    row_cursor += 1
+                for _, row in groupe.iterrows():
+                    current_row = row_cursor
+                    ws_indiv.row_dimensions[current_row].height = 20
                     
-                    for col_idx, h in enumerate(headers_indiv, 1):
-                        cell = ws_indiv.cell(row=row_cursor, column=col_idx, value=h)
-                        cell.fill, cell.font, cell.alignment = rouge_fflda, font_entete, Alignment(horizontal="center", vertical="center")
-                        ws_indiv.row_dimensions[row_cursor].height = 22
-                    row_cursor += 1
+                    c1 = ws_indiv.cell(row=current_row, column=1, value=row['Clt'])
+                    c2 = ws_indiv.cell(row=current_row, column=2, value=row['Nom'])
+                    c3 = ws_indiv.cell(row=current_row, column=3, value=row['Club'])
+                    c4 = ws_indiv.cell(row=current_row, column=4, value=row['Poids'])
+                    c5 = ws_indiv.cell(row=current_row, column=5, value=row['Points'])
                     
-                    for _, row in groupe.iterrows():
-                        current_row = row_cursor
-                        ws_indiv.row_dimensions[current_row].height = 20
-                        
-                        c1 = ws_indiv.cell(row=current_row, column=1, value=row['Clt'])
-                        c2 = ws_indiv.cell(row=current_row, column=2, value=row['Nom'])
-                        c3 = ws_indiv.cell(row=current_row, column=3, value=row['Club'])
-                        c4 = ws_indiv.cell(row=current_row, column=4, value=row['Poids'])
-                        c5 = ws_indiv.cell(row=current_row, column=5, value=row['Points'])
-                        
-                        c1.font = font_data_bold
-                        c2.font = font_data
-                        c3.font = font_data
-                        c4.font = font_data
-                        c5.font = font_data_bold
-                        
-                        for c in [c1, c2, c3, c4, c5]:
-                            c.border = b_fin
-                            c.alignment = Alignment(horizontal="center", vertical="center")
-                        c2.alignment = Alignment(horizontal="left", vertical="center")
-                        
-                        if row['Clt'] == 1: c1.fill = or_fill
-                        elif row['Clt'] == 2: c1.fill = argent_fill
-                        elif row['Clt'] == 3: c1.fill = bronze_fill
-                        
-                        row_cursor += 1
-                    row_cursor += 2
-                
-                ws_indiv.column_dimensions['A'].width = 10
-                ws_indiv.column_dimensions['B'].width = 30
-                ws_indiv.column_dimensions['C'].width = 25
-                ws_indiv.column_dimensions['D'].width = 15
-                ws_indiv.column_dimensions['E'].width = 12
+                    c1.font = font_data_bold
+                    c2.font = font_data
+                    c3.font = font_data
+                    c4.font = font_data
+                    c5.font = font_data_bold
+                    
+                    for c in [c1, c2, c3, c4, c5]:
+                        c.border = b_fin
+                        c.alignment = Alignment(horizontal="center", vertical="center")
+                    c2.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    if row['Clt'] == 1: c1.fill = or_fill
+                    elif row['Clt'] == 2: c1.fill = argent_fill
+                    elif row['Clt'] == 3: c1.fill = bronze_fill
+                    
+                    row_cursor += 1
+                row_cursor += 2
+            
+            ws_indiv.column_dimensions['A'].width = 10
+            ws_indiv.column_dimensions['B'].width = 30
+            ws_indiv.column_dimensions['C'].width = 25
+            ws_indiv.column_dimensions['D'].width = 15
+            ws_indiv.column_dimensions['E'].width = 12
 
-                # Configuration Impression Paysage A4 Excel
-                for ws in writer.book.worksheets:
-                    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-                    ws.page_setup.paperSize = ws.PAPERSIZE_A4
-                    ws.sheet_properties.pageSetUpPr.fitToPage = True
-                    ws.page_setup.fitToWidth = 1
-                    ws.page_setup.fitToHeight = 0
+            # Configuration Impression A4 Excel
+            for ws_b in [ws_clubs, ws_comites, ws_indiv]:
+                ws_b.page_setup.orientation = ws_b.ORIENTATION_LANDSCAPE
+                ws_b.page_setup.paperSize = ws_b.PAPERSIZE_A4
+                ws_b.sheet_properties.pageSetUpPr.fitToPage = True
+                ws_b.page_setup.fitToWidth = 1
+                ws_b.page_setup.fitToHeight = 0
 
-            # Génération du PDF officiel du bilan (A4 Portrait - Format Excel FFLDA)
-            pdf_bilan_bytes = None
+            # Ordonnancement officiel des onglets : Résumé, Grille, Bilans, puis toutes les poules
+            def sheet_order_key(s):
+                n = s.title.lower()
+                if "résumé" in n or "resume" in n: return (0, 0)
+                if "grille" in n: return (0, 1)
+                if "classement club" in n or "classement des clubs" in n: return (0, 2)
+                if "classement comit" in n: return (0, 3)
+                if "classements individuels" in n: return (0, 4)
+                if "u7" in n: return (1, 0, n)
+                if "u9" in n: return (1, 1, n)
+                if "u11" in n: return (1, 2, n)
+                return (1, 3, n)
+
+            wb_res._sheets.sort(key=sheet_order_key)
+
+            # Génération du Dossier Officiel Complet en PDF (A4 Portrait - Format Excel FFLDA) identique au Mode 1
+            pdf_bytes_dossier_complet = None
             try:
-                wb_bilan_excel = openpyxl.load_workbook(io.BytesIO(output_bilan.getvalue()), data_only=True)
-                pdf_bilan_bytes = generer_pdf_depuis_classeur_excel(wb_bilan_excel, nom_comp_officiel, wb=wb_bilan_excel)
-            except Exception as e_pdf_b:
-                st.warning(f"⚠️ Information : génération PDF du Bilan : {e_pdf_b}")
-                pdf_bilan_bytes = None
+                pdf_bytes_dossier_complet = generer_pdf_depuis_classeur_excel(wb_res, nom_comp_officiel, wb=wb_f or wb_res)
+            except Exception as e_pdf_c:
+                st.warning(f"⚠️ Information : génération PDF du Dossier Complet : {e_pdf_c}")
+
+            # Génération du Bilan seul en PDF (3 pages A4 Portrait)
+            sheets_bilan_only = [wb_res[s] for s in ["Classement Clubs", "Classement Comités", "Classements Individuels"] if s in wb_res.sheetnames]
+            pdf_bilan_only_bytes = None
+            try:
+                pdf_bilan_only_bytes = generer_pdf_depuis_classeur_excel(sheets_bilan_only, nom_comp_officiel, wb=wb_res)
+            except Exception:
+                pdf_bilan_only_bytes = None
+
+            # Sauvegarde du classeur Excel officiel complet
+            output_excel_complet = io.BytesIO()
+            wb_res.save(output_excel_complet)
+            excel_bytes_complet = output_excel_complet.getvalue()
 
             st.markdown("---")
-            st.markdown("### 📥 Téléchargements Complets du Bilan Officiel (Formats FFLDA)")
+            st.markdown("### 📥 Téléchargements Complets du Tournoi (Formats Officiels FFLDA)")
             col_bil_pdf, col_bil_xl = st.columns(2)
             with col_bil_pdf:
-                if pdf_bilan_bytes:
-                    st.download_button(
-                        label="📄 Télécharger le Bilan Officiel en PDF (A4 Portrait - Format Excel)",
-                        data=pdf_bilan_bytes,
-                        file_name=f"Bilan_Officiel_{nom_comp_officiel.replace(' ', '_')}.pdf",
-                        mime="application/pdf",
-                        key="btn_pdf_bilan"
-                    )
-                else:
-                    st.info("Le PDF du bilan est en cours de préparation...")
+                st.download_button(
+                    label="📄 Télécharger le Dossier Officiel en PDF (A4 Portrait - Format Excel)",
+                    data=pdf_bytes_dossier_complet or pdf_bilan_only_bytes,
+                    file_name=f"Dossier_Officiel_Resultats_{nom_comp_officiel.replace(' ', '_')}.pdf",
+                    mime="application/pdf",
+                    key="btn_pdf_dossier_resultats"
+                )
             with col_bil_xl:
                 st.download_button(
-                    label="📥 Télécharger le Bilan Officiel Excel (.xlsx)",
-                    data=output_bilan.getvalue(),
-                    file_name=f"Bilan_Officiel_{nom_comp_officiel.replace(' ', '_')}.xlsx",
+                    label="📥 Télécharger le Classeur Officiel Excel (.xlsx)",
+                    data=excel_bytes_complet,
+                    file_name=f"Tournoi_Resultats_{nom_comp_officiel.replace(' ', '_')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="btn_excel_bilan"
+                    key="btn_excel_dossier_resultats"
                 )
+
+            if pdf_bilan_only_bytes:
+                with st.expander("📄 Télécharger uniquement les Bilans Généraux (Clubs, Comités & Podiums)"):
+                    st.download_button(
+                        label="📄 Télécharger uniquement les Bilans en PDF (A4 Portrait)",
+                        data=pdf_bilan_only_bytes,
+                        file_name=f"Bilan_Officiel_{nom_comp_officiel.replace(' ', '_')}.pdf",
+                        mime="application/pdf",
+                        key="btn_pdf_bilan_seul"
+                    )
 
         except Exception as e:
             st.error(f"Erreur lors de l'analyse du fichier : {e}")

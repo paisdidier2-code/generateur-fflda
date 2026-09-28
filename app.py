@@ -4207,8 +4207,11 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         txt_sans_accents = "".join([c for c in txt_nfkd if unicodedata.category(c) != 'Mn'])
         return re.sub(r'[^a-z0-9]', '', txt_sans_accents.lower())
 
-    def extraire_valeur_numerique_cellule(cell_data_val, cell_form_val, ws_target=None):
+    def extraire_valeur_numerique_cellule(cell_data_val, cell_form_val, ws_target=None, depth=0):
         """Extrait une valeur numérique d'une cellule de score (nombre, '4 pts', formule un-évaluée)."""
+        if depth > 5:
+            return 0.0
+
         if cell_data_val is not None:
             s_val = str(cell_data_val).strip()
             if s_val not in ['', 'None', 'nan', '-', 'NR']:
@@ -4217,25 +4220,20 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     return float(s_num)
                 except ValueError:
                     pass
-                m_pts = re.search(r'^(\d+(?:\.\d+)?)\s*pts?', s_num, re.IGNORECASE)
+                m_pts = re.search(r'(-?\d+(?:\.\d+)?)\s*pts?', s_num, re.IGNORECASE)
                 if m_pts:
                     return float(m_pts.group(1))
-                m_start = re.search(r'^(\d+(?:\.\d+)?)', s_num)
+                m_start = re.search(r'^(-?\d+(?:\.\d+)?)', s_num)
                 if m_start:
                     return float(m_start.group(1))
 
         if cell_form_val is not None:
             s_form = str(cell_form_val).strip()
             if s_form.startswith('='):
-                m_ref = re.match(r'^=([A-Z]+[0-9]+)$', s_form, re.IGNORECASE)
-                if m_ref and ws_target is not None:
-                    try:
-                        ref_cell_val = ws_target[m_ref.group(1).upper()].value
-                        if ref_cell_val is not None:
-                            return extraire_valeur_numerique_cellule(ref_cell_val, None, ws_target)
-                    except Exception:
-                        pass
-                m_sum = re.match(r'^=SUM\(([A-Z]+[0-9]+):([A-Z]+[0-9]+)\)$', s_form, re.IGNORECASE)
+                expr = s_form[1:].strip()
+                
+                # Formule de somme: =SUM(...) ou =SOMME(...)
+                m_sum = re.match(r'^(?:SUM|SOMME)\s*\(\s*([A-Z]+[0-9]+)\s*[:;]\s*([A-Z]+[0-9]+)\s*\)$', expr, re.IGNORECASE)
                 if m_sum and ws_target is not None:
                     try:
                         c_start, c_end = m_sum.group(1).upper(), m_sum.group(2).upper()
@@ -4243,18 +4241,51 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                         sum_val = 0.0
                         for row_cells in cells:
                             for cell_item in row_cells:
-                                v_sub = extraire_valeur_numerique_cellule(cell_item.value, None, ws_target)
+                                v_sub = extraire_valeur_numerique_cellule(cell_item.value, None, ws_target, depth + 1)
                                 sum_val += v_sub
                         return sum_val
                     except Exception:
                         pass
-                m_num = re.search(r'^=(\d+(?:\.\d+)?)$', s_form)
-                if m_num:
-                    return float(m_num.group(1))
+
+                # Addition simple de cellules: =E5+F5+G5
+                if '+' in expr and ws_target is not None and not re.search(r'[()/*]', expr):
+                    parts = expr.split('+')
+                    sum_parts = 0.0
+                    all_valid = True
+                    for p_item in parts:
+                        p_clean = p_item.strip().upper()
+                        if re.match(r'^[A-Z]+[0-9]+$', p_clean):
+                            v_sub = extraire_valeur_numerique_cellule(ws_target[p_clean].value, None, ws_target, depth + 1)
+                            sum_parts += v_sub
+                        elif re.match(r'^-?\d+(\.\d+)?$', p_clean):
+                            sum_parts += float(p_clean)
+                        else:
+                            all_valid = False
+                            break
+                    if all_valid and sum_parts > 0:
+                        return sum_parts
+
+                # Référence directe de cellule: =G25 ou =H5
+                m_ref = re.match(r'^([A-Z]+[0-9]+)$', expr, re.IGNORECASE)
+                if m_ref and ws_target is not None:
+                    try:
+                        ref_cell_val = ws_target[m_ref.group(1).upper()].value
+                        if ref_cell_val is not None:
+                            return extraire_valeur_numerique_cellule(ref_cell_val, None, ws_target, depth + 1)
+                    except Exception:
+                        pass
+
+                # Formule avec valeur numérique directe
+                m_num = re.search(r'(-?\d+(?:\.\d+)?)', expr)
+                if m_num and not re.search(r'[A-Z]', expr):
+                    try:
+                        return float(m_num.group(1))
+                    except ValueError:
+                        pass
 
         return 0.0
 
-    def determiner_points_lutteur(ws_target, ws_form, r_row, col_tot, col_start_t=5):
+    def determiner_points_lutteur(ws_target, ws_form, r_row, col_tot, col_start_t=5, h_row=4):
         pts = 0.0
         if col_tot:
             val_d = ws_target.cell(row=r_row, column=col_tot).value
@@ -4266,8 +4297,8 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             found_tours = False
             max_col_tours = col_tot if (col_tot and col_tot > col_start_t) else (ws_target.max_column + 1)
             for c_t in range(col_start_t, max_col_tours):
-                val_header = str(ws_target.cell(row=4, column=c_t).value or "").strip().lower()
-                if any(x in val_header for x in ["total", "clt", "rang", "place", "club", "comité", "poids"]):
+                val_header = str(ws_target.cell(row=h_row, column=c_t).value or "").strip().lower()
+                if any(x in val_header for x in ["total", "clt", "rang", "place", "club", "comité", "poids", "vict"]):
                     continue
                 v_d = ws_target.cell(row=r_row, column=c_t).value
                 v_f = ws_form.cell(row=r_row, column=c_t).value if ws_form else None
@@ -4564,7 +4595,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
                     poids_val = formater_poids_local(poids_raw)
                     
-                    pts_val = determiner_points_lutteur(ws, ws_f, r, col_total_pts, col_start_t=5)
+                    pts_val = determiner_points_lutteur(ws, ws_f, r, col_total_pts, col_start_t=5, h_row=h_row)
                     
                     clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
                     try:
@@ -4587,35 +4618,28 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             total_pts_poule = sum(p.get("Points", 0) for p in lutteurs_poule)
             has_any_clt = any(p.get("Clt_Excel") is not None for p in lutteurs_poule)
             
-            if has_any_clt or total_pts_poule > 0:
-                sorted_p = sorted(
-                    lutteurs_poule, 
-                    key=lambda x: (
-                        x["Clt_Excel"] if x.get("Clt_Excel") is not None else 999, 
-                        -x.get("Points", 0)
-                    )
+            sorted_p = sorted(
+                lutteurs_poule, 
+                key=lambda x: (
+                    x["Clt_Excel"] if x.get("Clt_Excel") is not None else 999, 
+                    -x.get("Points", 0)
                 )
-                
-                cur_rank = 1
-                for idx, p in enumerate(sorted_p):
-                    if p.get("Clt_Excel") is not None:
-                        p["Clt"] = p["Clt_Excel"]
-                        try:
-                            cur_rank = max(cur_rank, int(p["Clt_Excel"]) + 1)
-                        except (ValueError, TypeError):
-                            pass
+            )
+            
+            cur_rank = 1
+            for idx, p in enumerate(sorted_p):
+                if p.get("Clt_Excel") is not None:
+                    p["Clt"] = p["Clt_Excel"]
+                    try:
+                        cur_rank = max(cur_rank, int(p["Clt_Excel"]) + 1)
+                    except (ValueError, TypeError):
+                        pass
+                else:
+                    if idx > 0 and sorted_p[idx-1].get("Clt") is not None and str(sorted_p[idx-1].get("Clt")) != "NR" and p.get("Points", 0) == sorted_p[idx-1].get("Points", 0) and p.get("Points", 0) > 0:
+                        p["Clt"] = sorted_p[idx-1]["Clt"]
                     else:
-                        if total_pts_poule > 0:
-                            if idx > 0 and sorted_p[idx-1].get("Clt") is not None and sorted_p[idx-1].get("Clt") != "NR" and p.get("Points", 0) == sorted_p[idx-1].get("Points", 0):
-                                p["Clt"] = sorted_p[idx-1]["Clt"]
-                            else:
-                                p["Clt"] = cur_rank
-                                cur_rank += 1
-                        else:
-                            p["Clt"] = "NR"
-            else:
-                for p in lutteurs_poule:
-                    p["Clt"] = "NR"
+                        p["Clt"] = cur_rank
+                        cur_rank += 1
                     
             tous_les_resultats.extend(lutteurs_poule)
             

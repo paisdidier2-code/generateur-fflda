@@ -74,9 +74,16 @@ def verifier_code_acces(code_saisi, url_csv):
             
         if hasattr(date_exp, 'to_pydatetime'):
             date_exp = date_exp.to_pydatetime()
+
+        # Récupération de l'heure exacte en France (Europe/Paris) car les serveurs Streamlit Cloud sont en heure UTC
+        try:
+            from zoneinfo import ZoneInfo
+            now_fr = datetime.now(ZoneInfo("Europe/Paris")).replace(tzinfo=None)
+        except Exception:
+            now_fr = datetime.utcnow() + timedelta(hours=2)
             
-        if datetime.now() > date_exp:
-            return False, f"❌ Ce code d'accès a expiré le {date_exp.strftime('%d/%m/%Y à %H:%M')}."
+        if now_fr > date_exp:
+            return False, f"❌ Ce code d'accès a expiré le {date_exp.strftime('%d/%m/%Y à %H:%M')} (Heure actuelle en France : {now_fr.strftime('%H:%M')})."
             
         return True, "✨ Accès autorisé !"
     except Exception as e:

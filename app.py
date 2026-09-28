@@ -60,11 +60,13 @@ def verifier_code_acces(code_saisi, url_csv):
             return False, "❌ Code d'accès invalide. Vérifiez la saisie ou contactez la FFLDA."
             
         date_exp_str = str(df_match.iloc[0][col_exp]).strip()
+        # Conversion des formats d'heures françaises (ex: 14h -> 14:00, 14h30 -> 14:30)
+        date_clean = re.sub(r'(\d+)\s*[hH]\s*(\d*)', lambda m: f"{m.group(1)}:{m.group(2) if m.group(2) else '00'}", date_exp_str)
         
         try:
-            date_exp = pd.to_datetime(date_exp_str, dayfirst=True)
+            date_exp = pd.to_datetime(date_clean, dayfirst=True)
         except Exception:
-            date_exp = pd.to_datetime(date_exp_str)
+            date_exp = pd.to_datetime(date_clean)
             
         if datetime.now() > date_exp:
             return False, f"❌ Ce code d'accès a expiré le {date_exp.strftime('%d/%m/%Y à %H:%M')}."

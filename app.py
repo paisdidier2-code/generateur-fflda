@@ -14,6 +14,91 @@ from openpyxl.utils import get_column_letter
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Générateur Officiel FFLDA", page_icon="🤼", layout="wide")
 
+# --- SYSTÈME D'ACCÈS TEMPORAIRES (GOOGLE SHEETS / CODES D'ACCÈS) ---
+if "authentifie" not in st.session_state:
+    st.session_state["authentifie"] = False
+
+# URL Google Sheets CSV par défaut (configurable via Streamlit Secrets ou l'interface)
+try:
+    URL_GOOGLE_SHEETS_DEFAUT = st.secrets.get("GSHEETS_CODES_URL", "")
+except Exception:
+    URL_GOOGLE_SHEETS_DEFAUT = ""
+
+def verifier_code_acces(code_saisi, url_csv):
+    if not code_saisi or not str(code_saisi).strip():
+        return False, "Veuillez saisir un code d'accès."
+    code_clean = str(code_saisi).strip().upper()
+    
+    # Codes de secours administrateur (toujours valides)
+    if code_clean in ["FFLDA-ADMIN", "FFLDA2026"]:
+        return True, "✨ Accès administrateur déverrouillé !"
+        
+    if not url_csv or "http" not in url_csv:
+        return True, "Code validé (mode démo sans tableau Google Sheets)."
+        
+    try:
+        # Chargement dynamique du tableau Google Sheets
+        df_codes = pd.read_csv(url_csv)
+        df_codes.columns = [str(c).strip().lower() for c in df_codes.columns]
+        
+        col_code = next((c for c in df_codes.columns if 'code' in c), None)
+        col_exp = next((c for c in df_codes.columns if 'expir' in c or 'date' in c), None)
+        
+        if not col_code or not col_exp:
+            return False, "⚠️ Le tableau Google Sheets doit contenir au moins les colonnes 'Code' et 'Expiration'."
+            
+        df_match = df_codes[df_codes[col_code].astype(str).str.strip().str.upper() == code_clean]
+        
+        if df_match.empty:
+            return False, "❌ Code d'accès invalide. Vérifiez la saisie ou contactez la FFLDA."
+            
+        date_exp_str = str(df_match.iloc[0][col_exp]).strip()
+        
+        try:
+            date_exp = pd.to_datetime(date_exp_str, dayfirst=True)
+        except Exception:
+            date_exp = pd.to_datetime(date_exp_str)
+            
+        if datetime.now() > date_exp:
+            return False, f"❌ Ce code d'accès a expiré le {date_exp.strftime('%d/%m/%Y à %H:%M')}."
+            
+        return True, "✨ Accès autorisé !"
+    except Exception as e:
+        return False, f"⚠️ Erreur lors de la vérification du code : {e}"
+
+if not st.session_state["authentifie"]:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col_acc1, col_acc2, col_acc3 = st.columns([1, 2, 1])
+    with col_acc2:
+        import os
+        if os.path.exists("logo_fflda.png"):
+            st.image("logo_fflda.png", use_container_width=True)
+        else:
+            st.image("https://www.fflutte.com/content/uploads/2021/10/fflutte-bleu-1024x842.png", use_container_width=True)
+        
+        st.markdown("<h2 style='text-align: center; color: #0055A4;'>🔒 Espace Sécurisé Organisateur FFLDA</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #555;'>Veuillez saisir votre code d'accès temporaire pour déverrouiller l'application.</p>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        code_saisi = st.text_input("🔑 Code d'accès", type="password", placeholder="Ex: PARIS-24H")
+        
+        with st.expander("⚙️ Configuration du lien Google Sheets (Administrateur)", expanded=False):
+            url_gsheets_in = st.text_input("URL du tableau Google Sheets (publié en CSV)", value=st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
+            st.session_state["url_gsheets_config"] = url_gsheets_in
+        
+        if st.button("🚀 Se Connecter", use_container_width=True):
+            valide, message = verifier_code_acces(code_saisi, st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
+            if valide:
+                st.session_state["authentifie"] = True
+                st.success(message)
+                st.rerun()
+            else:
+                st.error(message)
+                
+        st.markdown("---")
+        st.caption("Fédération Française de Lutte et Disciplines Associées — Plateforme Officielle de Gestion de Tournois")
+    st.stop()
+
 # --- MENU LATÉRAL (PARAMÈTRES INTERACTIFS) ---
 with st.sidebar:
     import os
@@ -4618,27 +4703,66 @@ else:
                 for idx_arb, arb in enumerate(liste_arbitres):
                     tapis_arbitres[idx_arb % nb_tapis].append(arb)
             if fichier_upload.name.endswith('.csv'):
-                df_raw = pd.read_csv(fichier_upload, sep=';', encoding='utf-8')
-                if len(df_raw.columns) == 1:
+                try:
+                    df_raw = pd.read_csv(fichier_upload, sep=';', encoding='utf-8')
+                    if len(df_raw.columns) == 1:
+                        fichier_upload.seek(0)
+                        df_raw = pd.read_csv(fichier_upload, sep=',', encoding='utf-8')
+                except UnicodeDecodeError:
                     fichier_upload.seek(0)
-                    df_raw = pd.read_csv(fichier_upload, sep=',', encoding='utf-8')
+                    df_raw = pd.read_csv(fichier_upload, sep=';', encoding='latin-1')
+                    if len(df_raw.columns) == 1:
+                        fichier_upload.seek(0)
+                        df_raw = pd.read_csv(fichier_upload, sep=',', encoding='latin-1')
             else:
-                df_temp = pd.read_excel(fichier_upload, nrows=5)
-                header_row = 0
-                for i, row in df_temp.iterrows():
-                    if 'N° Licence' in str(row.values) or 'Nom' in str(row.values) or "Catégorie d'âge" in str(row.values):
-                        header_row = i + 1
-                        break
-                fichier_upload.seek(0)
-                df_raw = pd.read_excel(fichier_upload, header=header_row)
+                try:
+                    df_temp = pd.read_excel(fichier_upload, nrows=10, header=None)
+                    header_row = 0
+                    for i, row in df_temp.iterrows():
+                        row_strs = [str(v).strip().lower() for v in row.values if pd.notna(v)]
+                        row_full = " ".join(row_strs)
+                        kw_matches = sum(1 for kw in ['licence', 'nom', 'club', 'catégorie', 'categorie', 'poids', 'sexe', 'style', 'maîtrise', 'maitrise', 'age'] if kw in row_full)
+                        if kw_matches >= 2:
+                            header_row = i
+                            break
+                    fichier_upload.seek(0)
+                    df_raw = pd.read_excel(fichier_upload, header=header_row)
+                except Exception:
+                    fichier_upload.seek(0)
+                    df_raw = pd.read_excel(fichier_upload)
 
-            if "Catégorie d'âge" in df_raw.columns: df_raw = df_raw.rename(columns={"Catégorie d'âge": "Age"})
-            if "Sigle du Club" in df_raw.columns: df_raw = df_raw.rename(columns={"Sigle du Club": "Club"})
-            
+            # Nettoyage des noms de colonnes (espaces superflus)
+            df_raw.columns = [str(c).strip() for c in df_raw.columns]
+
+            # 1. Catégorie d'âge / Age
+            age_col_found = None
+            for col_name in df_raw.columns:
+                col_str = str(col_name).strip().lower()
+                if any(k in col_str for k in ["catégorie d'âge", "categorie d'age", "catégorie d age", "categorie d age", "catégorie", "categorie", "age"]):
+                    age_col_found = col_name
+                    break
+            if age_col_found:
+                df_raw = df_raw.rename(columns={age_col_found: "Age"})
+            elif "Age" not in df_raw.columns:
+                df_raw["Age"] = ""
+
+            # 2. Club / Sigle du Club
+            club_col_found = None
+            for col_name in df_raw.columns:
+                col_str = str(col_name).strip().lower()
+                if any(k in col_str for k in ["sigle du club", "sigle club", "club", "équipe", "equipe", "structure"]):
+                    club_col_found = col_name
+                    break
+            if club_col_found:
+                df_raw = df_raw.rename(columns={club_col_found: "Club"})
+            elif "Club" not in df_raw.columns:
+                df_raw["Club"] = ""
+
+            # 3. Licence
             licence_col_found = None
             for col_name in df_raw.columns:
                 col_str = str(col_name).strip().lower()
-                if any(k in col_str for k in ["licence", "n° licence", "num_licence", "n°licence"]):
+                if any(k in col_str for k in ["licence", "n° licence", "num_licence", "n°licence", "numéro licence", "numero licence"]):
                     licence_col_found = col_name
                     break
             if licence_col_found:
@@ -4646,6 +4770,7 @@ else:
             elif "Licence" not in df_raw.columns:
                 df_raw["Licence"] = ""
 
+            # 4. Comité
             comite_col_found = None
             for col_name in df_raw.columns:
                 col_str = str(col_name).strip()
@@ -4655,8 +4780,10 @@ else:
                     break
             if comite_col_found:
                 df_raw = df_raw.rename(columns={comite_col_found: "Comité"})
-            if "Comité" not in df_raw.columns: df_raw["Comité"] = "Comité Non Renseigné"
+            if "Comité" not in df_raw.columns:
+                df_raw["Comité"] = "Comité Non Renseigné"
 
+            # 5. Style
             style_col_found = None
             for col_name in df_raw.columns:
                 col_str = str(col_name).strip().lower()
@@ -4668,6 +4795,7 @@ else:
             if "Style" not in df_raw.columns:
                 df_raw["Style"] = ""
 
+            # 6. Maîtrise / Niveau
             maitrise_col_found = None
             for col_name in df_raw.columns:
                 col_str = str(col_name).strip().lower()
@@ -4679,6 +4807,7 @@ else:
             if "Maîtrise" not in df_raw.columns:
                 df_raw["Maîtrise"] = ""
 
+            # 7. Sexe
             sexe_col_found = None
             for col_name in df_raw.columns:
                 col_str = str(col_name).strip().lower()
@@ -4690,8 +4819,50 @@ else:
             if "Sexe" not in df_raw.columns:
                 df_raw["Sexe"] = ""
 
-            if "Prénom" in df_raw.columns and "Nom" in df_raw.columns:
-                df_raw["Nom"] = df_raw["Nom"].astype(str) + " " + df_raw["Prénom"].astype(str)
+            # 8. Poids (Recherche robuste : Poids, Poids (kg), Poids pesée, Poids mesuré, Weight, etc.)
+            poids_col_found = None
+            for col_name in df_raw.columns:
+                col_str = str(col_name).strip().lower()
+                if any(k in col_str for k in ["poids", "weight", "pesée", "pesee", "mesuré", "mesure"]):
+                    poids_col_found = col_name
+                    break
+            if poids_col_found:
+                df_raw = df_raw.rename(columns={poids_col_found: "Poids"})
+            elif "Poids" not in df_raw.columns:
+                df_raw["Poids"] = ""
+
+            # 9. Nom et Prénom
+            nom_col_found = None
+            prenom_col_found = None
+            for col_name in df_raw.columns:
+                col_str = str(col_name).strip().lower()
+                if any(k in col_str for k in ["prénom", "prenom", "first name", "firstname"]):
+                    prenom_col_found = col_name
+                elif col_str in ["nom", "nom du lutteur", "nom athlète", "nom athlete", "nom complet", "athlète", "athlete"]:
+                    nom_col_found = col_name
+                elif "nom" in col_str and "club" not in col_str and not nom_col_found:
+                    nom_col_found = col_name
+
+            if nom_col_found and nom_col_found != "Nom":
+                df_raw = df_raw.rename(columns={nom_col_found: "Nom"})
+            if prenom_col_found and prenom_col_found != "Prénom":
+                df_raw = df_raw.rename(columns={prenom_col_found: "Prénom"})
+
+            if "Nom" not in df_raw.columns:
+                df_raw["Nom"] = ""
+
+            if "Prénom" in df_raw.columns:
+                def combiner_nom_prenom(row):
+                    n = str(row.get("Nom", "")).strip()
+                    p = str(row.get("Prénom", "")).strip()
+                    n = "" if n.lower() in ["nan", "none"] else n
+                    p = "" if p.lower() in ["nan", "none"] else p
+                    if n and p:
+                        if p.lower() in n.lower():
+                            return n
+                        return f"{n} {p}"
+                    return n or p
+                df_raw["Nom"] = df_raw.apply(combiner_nom_prenom, axis=1)
 
             def normaliser_age(val):
                 if val is None or pd.isna(val):
@@ -4730,8 +4901,10 @@ else:
             else:
                 df_inscr_total['Niveau'] = ''
 
-            # Nettoyage et conversion du poids
-            df_inscr_total['Poids_Clean'] = df_inscr_total['Poids'].astype(str).str.replace(',', '.')
+            # Nettoyage et conversion du poids (sécurisé contre KeyError et valeurs invalides)
+            if 'Poids' not in df_inscr_total.columns:
+                df_inscr_total['Poids'] = ''
+            df_inscr_total['Poids_Clean'] = df_inscr_total['Poids'].astype(str).str.replace(',', '.').str.strip()
             df_inscr_total['Poids_Num'] = pd.to_numeric(df_inscr_total['Poids_Clean'], errors='coerce').fillna(0)
             df_inscr_total['Poids'] = df_inscr_total['Poids_Num'].apply(formater_poids)
 

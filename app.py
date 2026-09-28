@@ -4328,7 +4328,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         if "u7" in titre_lower or "plateau" in titre_lower:
             h_row = 4
             col_nom, col_club, col_poids = 2, 3, 4
-            for r_search in [4, 5, 3]:
+            for r_search in [4, 5, 3, 2]:
                 for c_idx in range(1, ws.max_column + 1):
                     val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
                     if "nom" in val_h:
@@ -4364,225 +4364,59 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                 r += 1
             continue
 
-        # --- CAS B : POULES CROISÉES U13 (6 lutteurs : Poule A + Poule B + Finales) ---
-        if "crois" in titre_lower or "2 poules" in titre_lower or "poule a" in str(ws.cell(row=4, column=1).value or "").lower():
-            participants_croisees = []
-            
-            # Repérage podium final depuis les cartes podium
-            podium_croisees = {}
-            for r_c in range(1, min(ws.max_row + 1, 30)):
-                for c_c in range(1, min(ws.max_column + 1, 25)):
-                    v_cell_data = ws.cell(row=r_c, column=c_c).value
-                    v_cell_form = ws_f.cell(row=r_c, column=c_c).value if ws_f else None
-                    v_cell = extraire_texte_podium(v_cell_data, v_cell_form, ws)
-                    if "🥇" in v_cell or "OR" in v_cell:
-                        podium_croisees[1] = v_cell
-                    elif "🥈" in v_cell or "ARGENT" in v_cell:
-                        podium_croisees[2] = v_cell
-                    elif "🥉" in v_cell or "BRONZE" in v_cell:
-                        podium_croisees[3] = v_cell
-            
-            col_nom_cr, col_club_cr = 3, 4
-            for c_idx in range(1, 10):
-                v_h = str(ws.cell(row=5, column=c_idx).value or "").strip().lower()
-                if "nom" in v_h: col_nom_cr = c_idx
-                elif "club" in v_h: col_club_cr = c_idx
-            
-            # Lecture Poule A
-            for r_a in range(6, 11):
-                nom_a = ws.cell(row=r_a, column=col_nom_cr).value
-                club_a = str(ws.cell(row=r_a, column=col_club_cr).value or "Indépendant").strip()
-                if nom_a and est_ligne_lutteur_valide(nom_a, club_a):
-                    pts_a = determiner_points_lutteur(ws, ws_f, r_a, col_tot=8, col_start_t=5)
-                    clt_a = ws.cell(row=r_a, column=1).value
-                    participants_croisees.append({
-                        "Nom": str(nom_a).strip(), "Club": club_a, "Poule_Sub": "A", 
-                        "Points": pts_a, "Clt_Poule": clt_a, "Row": r_a
-                    })
-            
-            # Lecture Poule B
-            for r_b in range(12, 17):
-                nom_b = ws.cell(row=r_b, column=col_nom_cr).value
-                club_b = str(ws.cell(row=r_b, column=col_club_cr).value or "Indépendant").strip()
-                if nom_b and est_ligne_lutteur_valide(nom_b, club_b):
-                    pts_b = determiner_points_lutteur(ws, ws_f, r_b, col_tot=8, col_start_t=5)
-                    clt_b = ws.cell(row=r_b, column=1).value
-                    participants_croisees.append({
-                        "Nom": str(nom_b).strip(), "Club": club_b, "Poule_Sub": "B", 
-                        "Points": pts_b, "Clt_Poule": clt_b, "Row": r_b
-                    })
-            
-            # Attribution des rangs officiels depuis le podium Excel
-            for p in participants_croisees:
-                p_nom = p["Nom"]
-                norm_p_nom = normaliser_nom_comparaison(p_nom)
-                nom_parts = p_nom.strip().split()
-                norm_nom_famille = normaliser_nom_comparaison(nom_parts[0]) if nom_parts else ""
-                
-                clt_final = None
-                for rg in [1, 2, 3]:
-                    if rg in podium_croisees:
-                        txt_p = normaliser_nom_comparaison(podium_croisees[rg])
-                        if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
-                            clt_final = rg
-                            break
-                
-                if clt_final is None:
-                    try:
-                        c_p = int(p["Clt_Poule"])
-                        if c_p == 3: clt_final = 5
-                        elif c_p == 2: clt_final = 4
-                        elif c_p == 1: clt_final = 2
-                    except (ValueError, TypeError):
-                        clt_final = "NR"
-                
-                try:
-                    pts_val = int(round(float(p["Points"]))) if p["Points"] is not None else 0
-                except (ValueError, TypeError):
-                    pts_val = 0
-                
-                tous_les_resultats.append({
-                    "Poule": nom_feuille,
-                    "Nom": p["Nom"],
-                    "Club": p["Club"],
-                    "Comité": "Comité Non Renseigné",
-                    "Poids": "",
-                    "Points": pts_val,
-                    "Clt": clt_final
-                })
-            continue
-
-        # --- CAS C : TABLEAU U13 (Élimination directe avec repêchage) ---
-        if "tableau" in titre_lower or (ws.cell(row=4, column=1).value == "N°" and "nom" in str(ws.cell(row=4, column=2).value or "").lower()):
-            participants_tableau = []
-            h_row = 4
-            col_nom, col_club, col_poids = 2, 3, 4
-            for r_search in [4, 5, 3]:
-                for c_idx in range(1, ws.max_column + 1):
-                    val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
-                    if "nom" in val_h:
-                        col_nom = c_idx
-                        h_row = r_search
-                    elif "club" in val_h:
-                        col_club = c_idx
-                    elif "poids" in val_h:
-                        col_poids = c_idx
-                if col_nom:
-                    break
-            
-            r = h_row + 1
-            while r <= ws.max_row:
-                nom_raw = ws.cell(row=r, column=col_nom).value
-                if nom_raw is None and r > h_row + 25:
-                    break
-                if nom_raw is not None:
-                    nom = str(nom_raw).strip()
-                    club = str(ws.cell(row=r, column=col_club).value or "Indépendant").strip() if col_club else "Indépendant"
-                    poids = formater_poids_local(ws.cell(row=r, column=col_poids).value) if col_poids else ""
-                    
-                    if est_ligne_lutteur_valide(nom, club):
-                        participants_tableau.append({
-                            "Nom": nom,
-                            "Club": club if club not in ["", "-", "None"] else "Indépendant",
-                            "Poids": poids,
-                            "Clt": None
-                        })
-                r += 1
-            
-            podium_tableau = {}
-            for r_c in range(1, min(ws.max_row + 1, 60)):
-                for c_c in range(5, min(ws.max_column + 1, 40)):
-                    v_cell_data = ws.cell(row=r_c, column=c_c).value
-                    v_cell_form = ws_f.cell(row=r_c, column=c_c).value if ws_f else None
-                    v_cell = extraire_texte_podium(v_cell_data, v_cell_form, ws)
-                    if "🥇" in v_cell or "CHAMPION (OR)" in v_cell:
-                        podium_tableau[1] = v_cell
-                    elif "🥈" in v_cell or "VICE-CHAMPION" in v_cell:
-                        podium_tableau[2] = v_cell
-                    elif "🥉" in v_cell or "Bronze 1" in v_cell or "BRONZE" in v_cell:
-                        if 3 not in podium_tableau:
-                            podium_tableau[3] = [v_cell]
-                        else:
-                            if isinstance(podium_tableau[3], list):
-                                podium_tableau[3].append(v_cell)
-                            else:
-                                podium_tableau[3] = [podium_tableau[3], v_cell]
-            
-            for p in participants_tableau:
-                p_nom = p["Nom"]
-                norm_p_nom = normaliser_nom_comparaison(p_nom)
-                nom_parts = p_nom.strip().split()
-                norm_nom_famille = normaliser_nom_comparaison(nom_parts[0]) if nom_parts else ""
-                
-                clt = None
-                
-                if 1 in podium_tableau:
-                    txt_p = normaliser_nom_comparaison(podium_tableau[1])
-                    if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
-                        clt = 1
-                
-                if clt is None and 2 in podium_tableau:
-                    txt_p = normaliser_nom_comparaison(podium_tableau[2])
-                    if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
-                        clt = 2
-                
-                if clt is None and 3 in podium_tableau:
-                    b_list = podium_tableau[3] if isinstance(podium_tableau[3], list) else [podium_tableau[3]]
-                    for b_txt in b_list:
-                        txt_p = normaliser_nom_comparaison(b_txt)
-                        if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
-                            clt = 3
-                            break
-                
-                if clt is None:
-                    clt = "NR" if not podium_tableau else 5
-                
-                tous_les_resultats.append({
-                    "Poule": nom_feuille,
-                    "Nom": p["Nom"],
-                    "Club": p["Club"],
-                    "Comité": "Comité Non Renseigné",
-                    "Poids": p["Poids"],
-                    "Points": 0,
-                    "Clt": clt
-                })
-            continue
-
-        # --- CAS D : POULE NORDIQUE STANDARD (U9, U11, U13 petites poules) ---
-        h_row = 4
-        col_clt = 1
-        col_nom = 3
-        col_club = 4
-        col_comite = None
-        col_total_pts = None
-        col_poids = None
+        # --- CAS UNIVERSEL : SCANNER DYNAMIQUE (Poules Nordiques, Poules Croisées, Tableaux U13) ---
+        h_row = None
+        col_clt, col_nom, col_club, col_comite, col_total_pts, col_poids = 1, 3, 4, None, None, None
         
-        for r_search in [4, 5, 3, 2, 6]:
-            for c_idx in range(1, ws.max_column + 1):
+        for r_search in range(1, min(15, ws.max_row + 1)):
+            for c_idx in range(1, min(25, ws.max_column + 1)):
                 val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
                 if any(k in val_h for k in ["clt", "rang", "classt", "classement", "place"]):
                     col_clt = c_idx
                     h_row = r_search
-                elif any(k in val_h for k in ["nom", "prénom", "prenom", "lutteur", "athlete", "athléte"]):
+                elif any(k in val_h for k in ["nom", "prénom", "prenom", "lutteur", "athlete"]):
                     col_nom = c_idx
                     h_row = r_search
                 elif any(k in val_h for k in ["club", "équipe", "equipe"]):
                     col_club = c_idx
-                elif any(k in val_h for k in ["comité", "comite", "ligue", "région", "region", "c.r.", "cr"]):
+                elif any(k in val_h for k in ["comité", "comite", "ligue", "région"]):
                     col_comite = c_idx
-                elif any(k in val_h for k in ["total pts", "total points", "pts total", "points total", "pts clt", "pts classt", "tot pts", "pts", "points"]):
+                elif any(k in val_h for k in ["total pts", "total points", "pts total", "points total", "pts clt", "tot pts", "pts", "points"]):
                     if not any(k in val_h for k in ["tour", "t1", "t2", "t3", "t4", "t5"]):
                         col_total_pts = c_idx
                 elif any(k in val_h for k in ["poids", "kg"]):
                     col_poids = c_idx
-            if col_nom and (col_total_pts or col_club):
+            if col_nom and h_row:
                 break
-        
+
+        if not h_row:
+            h_row = 4
+
+        # Repérage des cartes de podium si présentes (pour Tableaux et Poules Croisées)
+        podium_cards = {}
+        for r_c in range(1, min(ws.max_row + 1, 60)):
+            for c_c in range(1, min(ws.max_column + 1, 40)):
+                v_cell_data = ws.cell(row=r_c, column=c_c).value
+                v_cell_form = ws_f.cell(row=r_c, column=c_c).value if ws_f else None
+                v_cell = extraire_texte_podium(v_cell_data, v_cell_form, ws)
+                if "🥇" in v_cell or "CHAMPION" in v_cell or "OR" in v_cell:
+                    podium_cards[1] = v_cell
+                elif "🥈" in v_cell or "VICE-CHAMPION" in v_cell or "ARGENT" in v_cell:
+                    podium_cards[2] = v_cell
+                elif "🥉" in v_cell or "BRONZE" in v_cell or "Bronze" in v_cell:
+                    if 3 not in podium_cards:
+                        podium_cards[3] = [v_cell]
+                    else:
+                        if isinstance(podium_cards[3], list):
+                            podium_cards[3].append(v_cell)
+                        else:
+                            podium_cards[3] = [podium_cards[3], v_cell]
+
         r = h_row + 1
         lutteurs_poule = []
         while r <= ws.max_row:
             nom_raw = ws.cell(row=r, column=col_nom).value
-            if nom_raw is None and r > h_row + 15:
+            if nom_raw is None and r > h_row + 25:
                 break
             if nom_raw is not None:
                 nom = str(nom_raw).strip()
@@ -4602,7 +4436,29 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                         clt_val = int(float(str(clt_raw).strip())) if clt_raw is not None and str(clt_raw).strip() not in ['', 'NR', 'None', '-'] else None
                     except (ValueError, TypeError):
                         clt_val = None
+
+                    # Recherche dans les cartes podium si disponible
+                    if clt_val is None and podium_cards:
+                        norm_p_nom = normaliser_nom_comparaison(nom)
+                        nom_parts = nom.strip().split()
+                        norm_nom_famille = normaliser_nom_comparaison(nom_parts[0]) if nom_parts else ""
                         
+                        if 1 in podium_cards:
+                            txt_p = normaliser_nom_comparaison(podium_cards[1])
+                            if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
+                                clt_val = 1
+                        if clt_val is None and 2 in podium_cards:
+                            txt_p = normaliser_nom_comparaison(podium_cards[2])
+                            if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
+                                clt_val = 2
+                        if clt_val is None and 3 in podium_cards:
+                            b_list = podium_cards[3] if isinstance(podium_cards[3], list) else [podium_cards[3]]
+                            for b_txt in b_list:
+                                txt_p = normaliser_nom_comparaison(b_txt)
+                                if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
+                                    clt_val = 3
+                                    break
+
                     lutteurs_poule.append({
                         "Poule": nom_feuille,
                         "Nom": nom,
@@ -4613,11 +4469,8 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                         "Clt_Excel": clt_val
                     })
             r += 1
-            
+
         if lutteurs_poule:
-            total_pts_poule = sum(p.get("Points", 0) for p in lutteurs_poule)
-            has_any_clt = any(p.get("Clt_Excel") is not None for p in lutteurs_poule)
-            
             sorted_p = sorted(
                 lutteurs_poule, 
                 key=lambda x: (
@@ -4793,12 +4646,32 @@ if mode_app.startswith("2"):
             except Exception:
                 pass
             
+            # Option d'édition interactive et aperçu direct
+            st.markdown("---")
+            with st.expander("✏️ Vérification & Ajustement des Résultats (Aperçu Interactif)", expanded=True):
+                st.info("💡 Vous pouvez modifier directement le rang (`Clt`), le `Nom`, le `Club`, ou les `Points` ci-dessous si besoin. Le classement général des clubs et comités régionaux sera immédiatement recalculé !")
+                df_bilan_edited = st.data_editor(
+                    df_bilan,
+                    column_config={
+                        "Clt": st.column_config.TextColumn("Clt / Rang", help="Rang officiel (1, 2, 3, 4, 5...)"),
+                        "Nom": st.column_config.TextColumn("Nom Prénom"),
+                        "Club": st.column_config.TextColumn("Club"),
+                        "Comité": st.column_config.TextColumn("Comité Régional"),
+                        "Poids": st.column_config.TextColumn("Poids"),
+                        "Points": st.column_config.NumberColumn("Points Victoire", step=1),
+                        "Poule": st.column_config.TextColumn("Poule / Catégorie"),
+                    },
+                    use_container_width=True,
+                    hide_index=True,
+                    key="editor_bilan_mode2"
+                )
+
             # --- CALCUL DU CLASSEMENT DES CLUBS ET DES COMITÉS RÉGIONAUX ---
             bareme_points = {1: 4, 2: 3, 3: 2, 4: 1}
             points_clubs = {}
             points_comites = {}
 
-            for _, row in df_bilan.iterrows():
+            for _, row in df_bilan_edited.iterrows():
                 nom = str(row.get("Nom", "")).strip()
                 club = str(row.get("Club", "")).strip()
                 comite = str(row.get("Comité", "Comité Non Renseigné")).strip()
@@ -4869,9 +4742,9 @@ if mode_app.startswith("2"):
             
             with tab_bilan_1:
                 st.subheader(f"Classements Individuels Officiels — {nom_comp_officiel}")
-                for poule in df_bilan['Poule'].unique():
+                for poule in df_bilan_edited['Poule'].unique():
                     st.markdown(f"#### 🤼 {poule}")
-                    sous_df = df_bilan[df_bilan['Poule'] == poule][['Clt', 'Nom', 'Club', 'Poids', 'Points']].copy()
+                    sous_df = df_bilan_edited[df_bilan_edited['Poule'] == poule][['Clt', 'Nom', 'Club', 'Poids', 'Points']].copy()
                     sous_df['Points'] = sous_df['Points'].astype(int)
                     sous_df = sous_df.reset_index(drop=True)
                     st.dataframe(sous_df, use_container_width=True, hide_index=True)
@@ -4980,8 +4853,8 @@ if mode_app.startswith("2"):
             row_cursor = 5
             headers_indiv = ["Clt", "NOM Prénom", "CLUB", "POIDS (kg)", "POINTS"]
             
-            for poule in df_bilan['Poule'].unique():
-                groupe = df_bilan[df_bilan['Poule'] == poule]
+            for poule in df_bilan_edited['Poule'].unique():
+                groupe = df_bilan_edited[df_bilan_edited['Poule'] == poule]
                 ws_indiv.merge_cells(start_row=row_cursor, start_column=1, end_row=row_cursor, end_column=5)
                 cell_cat = ws_indiv.cell(row=row_cursor, column=1, value=f"  CATÉGORIE / POULE : {poule}")
                 cell_cat.fill, cell_cat.font, cell_cat.alignment = bleu_fflda, font_section, Alignment(horizontal="left", vertical="center")

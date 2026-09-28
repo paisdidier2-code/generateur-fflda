@@ -293,6 +293,14 @@ def abreger_nom_onglet(nom_poule):
     txt = re.sub(r'\s+', ' ', txt)
     return txt[:31].strip()
 
+def nettoyer_nom_tour(val):
+    if not val:
+        return ""
+    val_str = str(val).strip()
+    if val_str.lower().startswith("tour "):
+        return val_str[5:].strip()
+    return val_str
+
 def charger_liste_arbitres(fichier_arbitres_in=None):
     """
     Charge la liste des arbitres inscrits depuis le fichier téléversé ou le fichier par défaut FFLDA - Inscription arbitres.xlsx.
@@ -5866,8 +5874,8 @@ else:
                         elif m["Type"] == "VIDE": ligne[col] = ""
                         else:
                             arb_str = f" (🛡️ {m['Arbitre']})" if m.get('Arbitre') and m['Arbitre'] != "Non attribué" else ""
-                            t_nom = m.get('Nom_Tour') or (f"Tour {m['Tour']}" if m.get('Tour') else "")
-                            tour_str = f" [🎯 {t_nom}]" if t_nom else ""
+                            t_nom = nettoyer_nom_tour(m.get('Nom_Tour') or m.get('Tour'))
+                            tour_str = f" [🎯 Tour : {t_nom}]" if t_nom else ""
                             ligne[col] = f"[{m['Heure']}] ({m['Duree']}m) [{m['Cat']}]{tour_str} - {m['Combattant 1']} vs {m['Combattant 2']}{arb_str}"
                     else: ligne[col] = ""
                 grille_ui.append(ligne)
@@ -5893,7 +5901,7 @@ else:
                             "N°": f"M{m_count_doc}",
                             "Heure": f"{m['Heure']}",
                             "Catégorie": m['Cat'],
-                            "Tour": m.get('Nom_Tour') or (f"Tour {m.get('Tour')}" if m.get('Tour') else "-"),
+                            "Tour": nettoyer_nom_tour(m.get('Nom_Tour') or m.get('Tour') or "-"),
                             "Lutteur Rouge": c1_t,
                             "Pt Clt (R)": "[   ]",
                             "Lutteur Bleu": c2_t,
@@ -5966,7 +5974,7 @@ else:
                             elif m["Type"] == "VIDE": ligne[col] = ""
                             else:
                                 arb_str = f"\n🛡️ Arbitre : {m['Arbitre']}" if m.get('Arbitre') and m['Arbitre'] != "Non attribué" else ""
-                                t_nom = m.get('Nom_Tour') or (f"Tour {m['Tour']}" if m.get('Tour') else "")
+                                t_nom = nettoyer_nom_tour(m.get('Nom_Tour') or m.get('Tour'))
                                 tour_str = f"\n🎯 Tour : {t_nom}" if t_nom else ""
                                 ligne[col] = f"🕘 {m['Heure']} ({m['Duree']} min)\n[{m['Cat']}]{tour_str}\n{m['Combattant 1']} VS {m['Combattant 2']}{arb_str}"
                         else: ligne[col] = ""
@@ -6040,7 +6048,7 @@ else:
                             m_count_t += 1
                             ws_mat.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=9)
                             arb_txt = f"  |  🛡️ Arbitre : {item['Arbitre']}" if item.get('Arbitre') and item['Arbitre'] != "Non attribué" else ""
-                            tour_label = item.get('Nom_Tour') or (f"Tour {item['Tour']}" if item.get('Tour') else "")
+                            tour_label = nettoyer_nom_tour(item.get('Nom_Tour') or item.get('Tour'))
                             tour_txt = f"  |  🎯 Tour : {tour_label}" if tour_label else ""
                             hdr_text = f"MATCH N° {m_count_t}  |  🕘 {item['Heure']} ({item['Duree']} min)  |  Catégorie : {item['Cat']}{tour_txt}{arb_txt}"
                             h_cell = ws_mat.cell(row=r_curr, column=1, value=hdr_text)
@@ -6432,7 +6440,7 @@ else:
                             badge_age = COULEURS_AGE_GRILLE.get(age_m, {}).get('badge', '')
                             badge_str = f"{badge_age} " if badge_age else ""
                             arb_info_st = f" | 🛡️ Arbitre : {m['Arbitre']}" if m.get('Arbitre') and m['Arbitre'] != "Non attribué" else ""
-                            t_nom = m.get('Nom_Tour') or (f"Tour {m['Tour']}" if m.get('Tour') else "")
+                            t_nom = nettoyer_nom_tour(m.get('Nom_Tour') or m.get('Tour'))
                             tour_st = f" | 🎯 Tour : **{t_nom}**" if t_nom else ""
                             st.markdown(f"#### 🤼 MATCH N° {m_count_st} — 🕘 {m['Heure']} ({m['Duree']} min) | Catégorie : {badge_str}`{m['Cat']}`{tour_st}{arb_info_st}")
                             

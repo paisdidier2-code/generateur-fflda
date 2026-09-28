@@ -4631,6 +4631,14 @@ if mode_app.startswith("2"):
             # Extraction des classements directement depuis les feuilles Excel officielles
             tous_les_resultats = extraire_resultats_classeur_excel(wb_res, wb_f)
             df_bilan = pd.DataFrame(tous_les_resultats)
+            if not df_bilan.empty:
+                if "Clt" in df_bilan.columns:
+                    df_bilan["Clt"] = df_bilan["Clt"].astype(str).replace(["None", "nan", "NoneType", "<NA>"], "NR")
+                if "Points" in df_bilan.columns:
+                    df_bilan["Points"] = pd.to_numeric(df_bilan["Points"], errors="coerce").fillna(0).astype(int)
+                for col_str in ["Nom", "Club", "Comité", "Poids", "Poule"]:
+                    if col_str in df_bilan.columns:
+                        df_bilan[col_str] = df_bilan[col_str].astype(str).replace(["None", "nan"], "")
             
             # Transmettre silencieusement les résultats et métriques du bilan au Webhook Facturation
             try:

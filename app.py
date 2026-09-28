@@ -44,8 +44,12 @@ def verifier_code_acces(code_saisi, url_csv):
             url_csv = url_csv.rstrip("/") + "/export?format=csv"
         
     try:
+        # Contournement du cache pour forcer la lecture en direct de Google Sheets
+        sep = "&" if "?" in url_csv else "?"
+        url_fresh = f"{url_csv}{sep}_cb={int(datetime.now().timestamp())}"
+        
         # Chargement dynamique du tableau Google Sheets
-        df_codes = pd.read_csv(url_csv)
+        df_codes = pd.read_csv(url_fresh)
         df_codes.columns = [str(c).strip().lower() for c in df_codes.columns]
         
         col_code = next((c for c in df_codes.columns if 'code' in c), None)
@@ -67,6 +71,9 @@ def verifier_code_acces(code_saisi, url_csv):
             date_exp = pd.to_datetime(date_clean, dayfirst=True)
         except Exception:
             date_exp = pd.to_datetime(date_clean)
+            
+        if hasattr(date_exp, 'to_pydatetime'):
+            date_exp = date_exp.to_pydatetime()
             
         if datetime.now() > date_exp:
             return False, f"❌ Ce code d'accès a expiré le {date_exp.strftime('%d/%m/%Y à %H:%M')}."

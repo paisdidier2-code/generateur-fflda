@@ -4152,9 +4152,14 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
     tous_les_resultats = []
     
     # Filtrer les onglets de compétition
+    mots_exclus = [
+        "résumé", "resume", "grille", "passage", "planning", "programme", 
+        "tapis", "déroulement", "deroulement", "schedule", "recap", "récap", 
+        "classement", "bilan", "general", "général", "liste", "inscrits", "club", "comité", "comite"
+    ]
     onglets_poules = [
         f for f in wb_data.sheetnames 
-        if not any(x in f.lower() for x in ["résumé", "resume", "grille tapis", "classement clubs", "classement comités", "classements individuels", "classement général", "bilan"])
+        if not any(x in f.lower() for x in mots_exclus)
     ]
     
     # Tri officiel des onglets : U7 d'abord, puis U9, U11, U13
@@ -4180,14 +4185,23 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             return False
         nom_s = str(nom_val).strip().lower()
         club_s = str(club_val or "").strip().lower()
-        if not nom_s or nom_s in ["none", "nan", "-", ""]:
+        if not nom_s or nom_s in ["none", "nan", "-", "", "0"]:
             return False
         invalides = [
             "nom", "nom prénom", "nom prenom", "nom & prénom", "nom/prénom", 
             "participant", "lutteur", "liste des participants", "n°", "clt", "rang",
-            "club", "poids", "comité", "comite", "points", "total pts", "total vict"
+            "club", "poids", "comité", "comite", "points", "total pts", "total vict",
+            "indépendant", "independant", "horaire", "heure", "tapis"
         ]
-        if nom_s in invalides or nom_s.startswith("catégorie") or nom_s.startswith("poule") or nom_s.startswith("compétition") or nom_s.startswith("tournoi"):
+        if nom_s in invalides:
+            return False
+        mots_interdits = [
+            "catégorie", "poule", "compétition", "tournoi", "repos", "pause", 
+            "pesée", "pesee", "échauffement", "echauffement", "matinée", "apres-midi", 
+            "après-midi", "remise", "récompense", "recompense", "grille", "passage", 
+            "tapis", "min", "h00", "h15", "h30", "h45", "00]", "15]", "30]", "45]"
+        ]
+        if any(m in nom_s for m in mots_interdits) or any(m in club_s for m in ["repos", "pause", "pesée", "échauffement"]):
             return False
         if club_s in ["club", "poids", "comité", "comite", "points", "total pts", "clt", "n°"]:
             return False
@@ -4384,15 +4398,12 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
 
         # --- CAS UNIVERSEL : SCANNER DYNAMIQUE (Poules Nordiques, Poules Croisées, Tableaux U13) ---
         h_row = None
-        col_clt, col_nom, col_club, col_comite, col_total_pts, col_poids = 1, 3, 4, None, None, None
+        col_clt, col_nom, col_club, col_comite, col_total_pts, col_poids = None, None, None, None, None, None
         
         for r_search in range(1, min(15, ws.max_row + 1)):
             for c_idx in range(1, min(25, ws.max_column + 1)):
                 val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
-                if any(k in val_h for k in ["clt", "rang", "classt", "classement", "place"]):
-                    col_clt = c_idx
-                    h_row = r_search
-                elif any(k in val_h for k in ["nom", "prénom", "prenom", "lutteur", "athlete"]):
+                if any(k in val_h for k in ["nom", "prénom", "prenom", "lutteur", "athlete"]):
                     col_nom = c_idx
                     h_row = r_search
                 elif any(k in val_h for k in ["club", "équipe", "equipe"]):
@@ -4406,6 +4417,13 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     col_poids = c_idx
             if col_nom and h_row:
                 break
+
+        if h_row and col_nom:
+            # Chercher col_clt STRICTEMENT après col_nom pour éviter de confondre la colonne 1 (N° du lutteur) avec le rang !
+            for c_idx in range(col_nom + 1, min(25, ws.max_column + 1)):
+                val_h = str(ws.cell(row=h_row, column=c_idx).value or "").strip().lower()
+                if any(k in val_h for k in ["clt", "rang", "classt", "classement", "place"]):
+                    col_clt = c_idx
 
         if not h_row:
             h_row = 4

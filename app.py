@@ -4136,7 +4136,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
     # Filtrer les onglets de compétition
     onglets_poules = [
         f for f in wb_data.sheetnames 
-        if not any(x in f.lower() for x in ["résumé", "resume", "grille", "classement clubs", "classement comités", "classements individuels", "classement général", "bilan"])
+        if not any(x in f.lower() for x in ["résumé", "resume", "grille tapis", "classement clubs", "classement comités", "classements individuels", "classement général", "bilan"])
     ]
     
     # Tri officiel des onglets : U7 d'abord, puis U9, U11, U13
@@ -4642,7 +4642,100 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                         cur_rank += 1
                     
             tous_les_resultats.extend(lutteurs_poule)
+
+    # Fallback : Si aucun résultat n'a été trouvé dans les onglets de poules,
+    # ou si le fichier contient un onglet de bilan individuel (ex: "Classements Individuels", "Bilan", "Classement Général")
+    if not tous_les_resultats:
+        def extraire_depuis_feuille_classement_individuel(ws_target, ws_form=None):
+            results = []
+            h_row = None
+            col_clt, col_nom, col_club, col_comite, col_poids, col_poule, col_pts = 1, 2, 3, None, None, None, None
             
+            for r_s in range(1, min(15, ws_target.max_row + 1)):
+                for c_i in range(1, min(20, ws_target.max_column + 1)):
+                    v_h = str(ws_target.cell(row=r_s, column=c_i).value or "").strip().lower()
+                    if any(k in v_h for k in ["clt", "rang", "place"]):
+                        col_clt = c_i
+                        h_row = r_s
+                    elif any(k in v_h for k in ["nom", "prénom", "prenom", "lutteur"]):
+                        col_nom = c_i
+                        h_row = r_s
+                    elif "club" in v_h:
+                        col_club = c_i
+                    elif any(k in v_h for k in ["comité", "comite", "ligue"]):
+                        col_comite = c_i
+                    elif "poids" in v_h:
+                        col_poids = c_i
+                    elif any(k in v_h for k in ["poule", "catégorie", "categorie", "groupe"]):
+                        col_poule = c_i
+                    elif any(k in v_h for k in ["pts", "points", "total"]):
+                        col_pts = c_i
+                if col_nom and h_row:
+                    break
+
+            if not h_row:
+                return results
+
+            current_poule = ws_target.title
+            r = h_row + 1
+            while r <= ws_target.max_row:
+                nom_raw = ws_target.cell(row=r, column=col_nom).value
+                if nom_raw is None and r > h_row + 50:
+                    break
+                if nom_raw is not None:
+                    nom = str(nom_raw).strip()
+                    club = str(ws_target.cell(row=r, column=col_club).value or "Indépendant").strip() if col_club else "Indépendant"
+                    
+                    nom_l = nom.lower()
+                    if any(k in nom_l for k in ["poule", "catégorie", "categorie", "kg", "u7", "u9", "u11", "u13"]):
+                        if not est_ligne_lutteur_valide(nom, club):
+                            current_poule = nom
+                            r += 1
+                            continue
+                    
+                    if est_ligne_lutteur_valide(nom, club):
+                        clt_raw = ws_target.cell(row=r, column=col_clt).value if col_clt else None
+                        try:
+                            clt_val = int(float(str(clt_raw).strip())) if clt_raw is not None and str(clt_raw).strip() not in ['', 'NR', 'None', '-'] else "NR"
+                        except (ValueError, TypeError):
+                            clt_val = "NR"
+                        
+                        poule_val = str(ws_target.cell(row=r, column=col_poule).value or "").strip() if col_poule else ""
+                        if not poule_val or poule_val in ["None", "nan", "-"]:
+                            poule_val = current_poule
+                        
+                        comite_val = str(ws_target.cell(row=r, column=col_comite).value or "").strip() if col_comite else "Comité Non Renseigné"
+                        if not comite_val or comite_val in ["None", "nan", "-"]:
+                            comite_val = "Comité Non Renseigné"
+
+                        poids_val = formater_poids_local(ws_target.cell(row=r, column=col_poids).value) if col_poids else ""
+                        
+                        pts_val = 0
+                        if col_pts:
+                            pts_val = determiner_points_lutteur(ws_target, ws_form, r, col_pts, col_start_t=5, h_row=h_row)
+
+                        results.append({
+                            "Poule": poule_val,
+                            "Nom": nom,
+                            "Club": club if club not in ["", "-", "None"] else "Indépendant",
+                            "Comité": comite_val,
+                            "Poids": poids_val,
+                            "Points": pts_val,
+                            "Clt": clt_val
+                        })
+                r += 1
+
+            return results
+
+        for s_name in wb_data.sheetnames:
+            s_lower = s_name.lower()
+            if any(k in s_lower for k in ["classement", "individuel", "bilan", "résultat", "resultat", "général", "general"]):
+                if not any(k in s_lower for k in ["club", "comité", "comite"]):
+                    res_summary = extraire_depuis_feuille_classement_individuel(wb_data[s_name], wb_formula[s_name] if (wb_formula and s_name in wb_formula.sheetnames) else None)
+                    if res_summary:
+                        tous_les_resultats.extend(res_summary)
+                        break
+
     return tous_les_resultats
 
 

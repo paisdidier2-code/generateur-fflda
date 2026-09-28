@@ -89,6 +89,44 @@ def verifier_code_acces(code_saisi, url_csv):
     except Exception as e:
         return False, f"⚠️ Erreur lors de la vérification du code : {e}"
 
+def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_peses, nb_matchs):
+    """
+    Transmet silencieusement en arrière-plan les métriques de facturation vers le webhook ou Google Form.
+    """
+    try:
+        url_webhook = None
+        try:
+            url_webhook = st.secrets.get("BILLING_WEBHOOK_URL", "")
+        except Exception:
+            pass
+        if not url_webhook:
+            url_webhook = st.session_state.get("url_billing_webhook", "")
+            
+        if not url_webhook or "http" not in url_webhook:
+            return
+            
+        try:
+            from zoneinfo import ZoneInfo
+            now_str = datetime.now(ZoneInfo("Europe/Paris")).strftime("%d/%m/%Y %H:%M:%S")
+        except Exception:
+            now_str = (datetime.utcnow() + timedelta(hours=2)).strftime("%d/%m/%Y %H:%M:%S")
+            
+        payload = {
+            "code_organisateur": str(code_organisateur or "ANONYME"),
+            "nom_tournoi": str(nom_tournoi or "Tournoi sans nom"),
+            "date": now_str,
+            "total_inscrits": int(nb_inscrits or 0),
+            "total_peses": int(nb_peses or 0),
+            "total_matchs": int(nb_matchs or 0)
+        }
+        
+        data = urllib.parse.urlencode(payload).encode('utf-8')
+        req = urllib.request.Request(url_webhook, data=data, headers={'User-Agent': 'FFLDA-Billing/1.0'})
+        with urllib.request.urlopen(req, timeout=2.0):
+            pass
+    except Exception:
+        pass
+
 if not st.session_state["authentifie"]:
     st.markdown("<br><br>", unsafe_allow_html=True)
     col_acc1, col_acc2, col_acc3 = st.columns([1, 2, 1])
@@ -105,9 +143,11 @@ if not st.session_state["authentifie"]:
         
         code_saisi = st.text_input("🔑 Code d'accès", type="password", placeholder="Ex: PARIS-24H")
         
-        with st.expander("⚙️ Configuration du lien Google Sheets (Administrateur)", expanded=False):
+        with st.expander("⚙️ Configuration des accès & Facturation (Administrateur)", expanded=False):
             url_gsheets_in = st.text_input("URL du tableau Google Sheets (publié en CSV)", value=st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
             st.session_state["url_gsheets_config"] = url_gsheets_in
+            url_billing_in = st.text_input("URL Webhook de facturation (Optionnel)", value=st.session_state.get("url_billing_webhook", ""))
+            st.session_state["url_billing_webhook"] = url_billing_in
         
         if st.button("🚀 Se Connecter", use_container_width=True):
             valide, message = verifier_code_acces(code_saisi, st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
@@ -5715,6 +5755,18 @@ else:
             str_comp_u13 = f"{fin_u11_globale.strftime('%H:%M')} - {fin_estimee.strftime('%H:%M')}"
 
             st.success("✨ Fichier analysé avec succès ! Tournoi généré.")
+            
+            # --- JOURNALISATION AUTOMATIQUE SILENCIEUSE DE LA FACTURATION ---
+            try:
+                enregistrer_log_facturation(
+                    code_organisateur=st.session_state.get("code_session", "ORGANISATEUR"),
+                    nom_tournoi=nom_competition,
+                    nb_inscrits=total_inscrits_global,
+                    nb_peses=total_participants_peses,
+                    nb_matchs=total_matchs_calcules
+                )
+            except Exception:
+                pass
             
             # --- PRÉPARATION DES DONNÉES DU RÉSUMÉ ---
             lignes_accueil = [

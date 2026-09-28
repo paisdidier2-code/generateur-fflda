@@ -4207,6 +4207,79 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
         txt_sans_accents = "".join([c for c in txt_nfkd if unicodedata.category(c) != 'Mn'])
         return re.sub(r'[^a-z0-9]', '', txt_sans_accents.lower())
 
+    def extraire_valeur_numerique_cellule(cell_data_val, cell_form_val, ws_target=None):
+        """Extrait une valeur numérique d'une cellule de score (nombre, '4 pts', formule un-évaluée)."""
+        if cell_data_val is not None:
+            s_val = str(cell_data_val).strip()
+            if s_val not in ['', 'None', 'nan', '-', 'NR']:
+                s_num = s_val.replace(',', '.')
+                try:
+                    return float(s_num)
+                except ValueError:
+                    pass
+                m_pts = re.search(r'^(\d+(?:\.\d+)?)\s*pts?', s_num, re.IGNORECASE)
+                if m_pts:
+                    return float(m_pts.group(1))
+                m_start = re.search(r'^(\d+(?:\.\d+)?)', s_num)
+                if m_start:
+                    return float(m_start.group(1))
+
+        if cell_form_val is not None:
+            s_form = str(cell_form_val).strip()
+            if s_form.startswith('='):
+                m_ref = re.match(r'^=([A-Z]+[0-9]+)$', s_form, re.IGNORECASE)
+                if m_ref and ws_target is not None:
+                    try:
+                        ref_cell_val = ws_target[m_ref.group(1).upper()].value
+                        if ref_cell_val is not None:
+                            return extraire_valeur_numerique_cellule(ref_cell_val, None, ws_target)
+                    except Exception:
+                        pass
+                m_sum = re.match(r'^=SUM\(([A-Z]+[0-9]+):([A-Z]+[0-9]+)\)$', s_form, re.IGNORECASE)
+                if m_sum and ws_target is not None:
+                    try:
+                        c_start, c_end = m_sum.group(1).upper(), m_sum.group(2).upper()
+                        cells = ws_target[c_start:c_end]
+                        sum_val = 0.0
+                        for row_cells in cells:
+                            for cell_item in row_cells:
+                                v_sub = extraire_valeur_numerique_cellule(cell_item.value, None, ws_target)
+                                sum_val += v_sub
+                        return sum_val
+                    except Exception:
+                        pass
+                m_num = re.search(r'^=(\d+(?:\.\d+)?)$', s_form)
+                if m_num:
+                    return float(m_num.group(1))
+
+        return 0.0
+
+    def determiner_points_lutteur(ws_target, ws_form, r_row, col_tot, col_start_t=5):
+        pts = 0.0
+        if col_tot:
+            val_d = ws_target.cell(row=r_row, column=col_tot).value
+            val_f = ws_form.cell(row=r_row, column=col_tot).value if ws_form else None
+            pts = extraire_valeur_numerique_cellule(val_d, val_f, ws_target)
+
+        if pts == 0.0:
+            sum_tours = 0.0
+            found_tours = False
+            max_col_tours = col_tot if (col_tot and col_tot > col_start_t) else (ws_target.max_column + 1)
+            for c_t in range(col_start_t, max_col_tours):
+                val_header = str(ws_target.cell(row=4, column=c_t).value or "").strip().lower()
+                if any(x in val_header for x in ["total", "clt", "rang", "place", "club", "comité", "poids"]):
+                    continue
+                v_d = ws_target.cell(row=r_row, column=c_t).value
+                v_f = ws_form.cell(row=r_row, column=c_t).value if ws_form else None
+                val_num = extraire_valeur_numerique_cellule(v_d, v_f, ws_target)
+                if val_num > 0:
+                    sum_tours += val_num
+                    found_tours = True
+            if found_tours:
+                pts = sum_tours
+
+        return int(round(pts))
+
     for nom_feuille in onglets_poules:
         ws = wb_data[nom_feuille]
         ws_f = wb_formula[nom_feuille] if (wb_formula and nom_feuille in wb_formula.sheetnames) else None
@@ -4289,7 +4362,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                 nom_a = ws.cell(row=r_a, column=col_nom_cr).value
                 club_a = str(ws.cell(row=r_a, column=col_club_cr).value or "Indépendant").strip()
                 if nom_a and est_ligne_lutteur_valide(nom_a, club_a):
-                    pts_a = ws.cell(row=r_a, column=8).value
+                    pts_a = determiner_points_lutteur(ws, ws_f, r_a, col_tot=8, col_start_t=5)
                     clt_a = ws.cell(row=r_a, column=1).value
                     participants_croisees.append({
                         "Nom": str(nom_a).strip(), "Club": club_a, "Poule_Sub": "A", 
@@ -4301,7 +4374,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                 nom_b = ws.cell(row=r_b, column=col_nom_cr).value
                 club_b = str(ws.cell(row=r_b, column=col_club_cr).value or "Indépendant").strip()
                 if nom_b and est_ligne_lutteur_valide(nom_b, club_b):
-                    pts_b = ws.cell(row=r_b, column=8).value
+                    pts_b = determiner_points_lutteur(ws, ws_f, r_b, col_tot=8, col_start_t=5)
                     clt_b = ws.cell(row=r_b, column=1).value
                     participants_croisees.append({
                         "Nom": str(nom_b).strip(), "Club": club_b, "Poule_Sub": "B", 
@@ -4467,7 +4540,8 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                 elif any(k in val_h for k in ["comité", "comite", "ligue", "région", "region", "c.r.", "cr"]):
                     col_comite = c_idx
                 elif any(k in val_h for k in ["total pts", "total points", "pts total", "points total", "pts clt", "pts classt", "tot pts", "pts", "points"]):
-                    col_total_pts = c_idx
+                    if not any(k in val_h for k in ["tour", "t1", "t2", "t3", "t4", "t5"]):
+                        col_total_pts = c_idx
                 elif any(k in val_h for k in ["poids", "kg"]):
                     col_poids = c_idx
             if col_nom and (col_total_pts or col_club):
@@ -4490,32 +4564,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
                     poids_val = formater_poids_local(poids_raw)
                     
-                    pts_val = 0
-                    if col_total_pts:
-                        total_pts_raw = ws.cell(row=r, column=col_total_pts).value
-                        try:
-                            if total_pts_raw is not None and str(total_pts_raw).strip() not in ['', 'None', 'nan', '-']:
-                                pts_val = int(round(float(str(total_pts_raw).strip())))
-                        except (ValueError, TypeError):
-                            pts_val = 0
-                    
-                    # Fallback : Si Total Pts est 0 ou non évalué, sommer les colonnes des tours
-                    if pts_val == 0:
-                        sum_tours = 0
-                        found_tours = False
-                        col_start_tours = 6
-                        col_end_tours = col_total_pts if col_total_pts else (ws.max_column + 1)
-                        for col_t in range(col_start_tours, col_end_tours):
-                            val_t_c = ws.cell(row=r, column=col_t).value
-                            try:
-                                if val_t_c is not None and str(val_t_c).strip() not in ['', 'None', 'nan', '-']:
-                                    v_num = float(str(val_t_c).strip())
-                                    sum_tours += v_num
-                                    found_tours = True
-                            except (ValueError, TypeError):
-                                pass
-                        if found_tours:
-                            pts_val = int(round(sum_tours))
+                    pts_val = determiner_points_lutteur(ws, ws_f, r, col_total_pts, col_start_t=5)
                     
                     clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
                     try:

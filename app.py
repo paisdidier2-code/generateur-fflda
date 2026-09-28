@@ -113,6 +113,7 @@ if not st.session_state["authentifie"]:
             valide, message = verifier_code_acces(code_saisi, st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
             if valide:
                 st.session_state["authentifie"] = True
+                st.session_state["code_session"] = code_saisi.strip().upper()
                 st.success(message)
                 st.rerun()
             else:
@@ -121,6 +122,16 @@ if not st.session_state["authentifie"]:
         st.markdown("---")
         st.caption("Fédération Française de Lutte et Disciplines Associées — Plateforme Officielle de Gestion de Tournois")
     st.stop()
+
+# --- VÉRIFICATION CONTINUELLE EN TEMPS RÉEL DE L'EXPIRATION ---
+if st.session_state.get("authentifie"):
+    code_sess = st.session_state.get("code_session", "")
+    if code_sess not in ["FFLDA-ADMIN", "FFLDA2026"]:
+        valide_encore, msg_exp = verifier_code_acces(code_sess, st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
+        if not valide_encore:
+            st.session_state["authentifie"] = False
+            st.error(f"⏰ {msg_exp}")
+            st.stop()
 
 # --- MENU LATÉRAL (PARAMÈTRES INTERACTIFS) ---
 with st.sidebar:

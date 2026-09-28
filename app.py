@@ -91,12 +91,13 @@ def verifier_code_acces(code_saisi, url_csv):
 
 URL_BILLING_WEBHOOK_DEFAUT = "https://script.google.com/macros/s/AKfycbxboXVY0FbLYQX6ZeBgDt4lg2fJ6eDIxfW-1BswZRoz5sLqAqBLCUGk7sLHoqpMW_C0/exec"
 
-def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_peses, nb_matchs):
+def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_peses, nb_matchs, details_resultats=None):
     """
-    Transmet silencieusement en arrière-plan les métriques du tournoi vers Google Sheets.
+    Transmet silencieusement en arrière-plan les métriques et résultats du tournoi vers Google Sheets.
     La facturation et les formules sont gérées directement dans Google Sheets.
     """
     try:
+        import json
         url_webhook = None
         try:
             url_webhook = st.secrets.get("BILLING_WEBHOOK_URL", URL_BILLING_WEBHOOK_DEFAUT)
@@ -120,12 +121,13 @@ def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_
             "date": now_str,
             "total_inscrits": int(nb_inscrits or 0),
             "total_peses": int(nb_peses or 0),
-            "total_matchs": int(nb_matchs or 0)
+            "total_matchs": int(nb_matchs or 0),
+            "details_resultats": json.dumps(details_resultats or [], ensure_ascii=False)
         }
         
         data = urllib.parse.urlencode(payload).encode('utf-8')
         req = urllib.request.Request(url_webhook, data=data, headers={'User-Agent': 'FFLDA-Billing/1.0'})
-        with urllib.request.urlopen(req, timeout=2.0):
+        with urllib.request.urlopen(req, timeout=3.0):
             pass
     except Exception:
         pass
@@ -4449,6 +4451,20 @@ if mode_app.startswith("2"):
             tous_les_resultats = extraire_resultats_classeur_excel(wb_res, wb_f)
             df_bilan = pd.DataFrame(tous_les_resultats)
             
+            # Transmettre silencieusement les résultats et métriques du bilan au Webhook Facturation
+            try:
+                nb_peses_bilan = sum(1 for p in tous_les_resultats if str(p.get("Clt", "NR")) != "NR")
+                enregistrer_log_facturation(
+                    code_organisateur=st.session_state.get("code_session", "ORGANISATEUR"),
+                    nom_tournoi=f"{nom_comp_officiel} [BILAN FINAL]",
+                    nb_inscrits=len(df_bilan),
+                    nb_peses=nb_peses_bilan,
+                    nb_matchs=len(df_bilan),
+                    details_resultats=tous_les_resultats
+                )
+            except Exception:
+                pass
+            
             # --- CALCUL DU CLASSEMENT DES CLUBS ET DES COMITÉS RÉGIONAUX ---
             bareme_points = {1: 4, 2: 3, 3: 2, 4: 1}
             points_clubs = {}
@@ -5811,7 +5827,7 @@ else:
             try:
                 enregistrer_log_facturation(
                     code_organisateur=st.session_state.get("code_session", "ORGANISATEUR"),
-                    nom_tournoi=nom_competition,
+                    nom_tournoi=f"{nom_competition} [GÉNÉRATION TOURNOI]",
                     nb_inscrits=total_inscrits_global,
                     nb_peses=total_participants_peses,
                     nb_matchs=total_matchs_calcules

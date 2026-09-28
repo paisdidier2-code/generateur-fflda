@@ -2310,8 +2310,8 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
         # 5. Podiums Or & Argent
         r_fn = f"IF({fn_ptr.coordinate}=\"\",0,{fn_ptr.coordinate})"
         b_fn = f"IF({fn_ptb.coordinate}=\"\",0,{fn_ptb.coordinate})"
-        form_gold = f'=IF({r_fn}+{b_fn}=0, "🥇 CHAMPION (OR)" & CHAR(10) & "Vainqueur Grande Finale", "🥇 CHAMPION (OR)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_fn}>{b_fn}, {fn_r.coordinate}, IF({b_fn}>{r_fn}, {fn_b.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", ""))'
-        form_silver = f'=IF({r_fn}+{b_fn}=0, "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "Perdant Grande Finale", "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_fn}>{b_fn}, {fn_b.coordinate}, IF({b_fn}>{r_fn}, {fn_r.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", ""))'
+        form_gold = f'=IFERROR(IF({r_fn}+{b_fn}=0, "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", "🥇 CHAMPION (OR)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_fn}>{b_fn}, {fn_r.coordinate}, IF({b_fn}>{r_fn}, {fn_b.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", "")), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente")'
+        form_silver = f'=IFERROR(IF({r_fn}+{b_fn}=0, "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_fn}>{b_fn}, {fn_b.coordinate}, IF({b_fn}>{r_fn}, {fn_r.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", "")), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente")'
         draw_excel_podium_card(ws, 12, col_pod, "🥇 CHAMPION (OR)", "Vainqueur Grande Finale", fill_gold, font_color="B45309", formula_val=form_gold)
         draw_excel_podium_card(ws, 15, col_pod, "🥈 VICE-CHAMPION (ARGENT)", "Perdant Grande Finale", fill_silver, font_color="475569", formula_val=form_silver)
 
@@ -2356,7 +2356,7 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
 
         r_b1 = f"IF({b1_ptr.coordinate}=\"\",0,{b1_ptr.coordinate})"
         b_b1 = f"IF({b1_ptb.coordinate}=\"\",0,{b1_ptb.coordinate})"
-        form_b1 = f'=IF({r_b1}+{b_b1}=0, "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & "Vainqueur Finale Bronze 1", "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_b1}>{b_b1}, {b1_r.coordinate}, IF({b_b1}>{r_b1}, {b1_b.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", ""))'
+        form_b1 = f'=IFERROR(IF({r_b1}+{b_b1}=0, "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & "En attente", "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_b1}>{b_b1}, {b1_r.coordinate}, IF({b_b1}>{r_b1}, {b1_b.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", "")), "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & "En attente")'
         draw_excel_podium_card(ws, row_rep+3, col_pod, "🥉 3ème PLACE (Bronze 1)", "Vainqueur Finale Bronze 1", fill_bronze, font_color="9A3412", formula_val=form_b1)
 
         # Finale Bronze 2 (Vainqueur Repêchage 2 ou Perdant QF 3 vs Perdant Demi-Finale 1)
@@ -2369,7 +2369,7 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
 
         r_b2 = f"IF({b2_ptr.coordinate}=\"\",0,{b2_ptr.coordinate})"
         b_b2 = f"IF({b2_ptb.coordinate}=\"\",0,{b2_ptb.coordinate})"
-        form_b2 = f'=IF({r_b2}+{b_b2}=0, "🥉 3ème PLACE (Bronze 2)" & CHAR(10) & "Vainqueur Finale Bronze 2", "🥉 3ème PLACE (Bronze 2)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_b2}>{b_b2}, {b2_r.coordinate}, IF({b_b2}>{r_b2}, {b2_b.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", ""))'
+        form_b2 = f'=IFERROR(IF({r_b2}+{b_b2}=0, "🥉 3ème PLACE (Bronze 2)" & CHAR(10) & "En attente", "🥉 3ème PLACE (Bronze 2)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_b2}>{b_b2}, {b2_r.coordinate}, IF({b_b2}>{r_b2}, {b2_b.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", "")), "🥉 3ème PLACE (Bronze 2)" & CHAR(10) & "En attente")'
         draw_excel_podium_card(ws, row_rep+8, col_pod, "🥉 3ème PLACE (Bronze 2)", "Vainqueur Finale Bronze 2", fill_bronze, font_color="9A3412", formula_val=form_b2)
 
         # Liaison dynamique vers les cartes de match sur les Grilles Tapis
@@ -2928,25 +2928,25 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
     
     if len(liste_p) > 2:
         form_gold = (
-            f'=IF(OR(ISNA(MATCH(1, {plage_clt}, 0)), INDEX({plage_totaux}, MATCH(1, {plage_clt}, 0))=0), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
+            f'=IFERROR(IF(OR(SUM({plage_totaux})=0, INDEX({plage_totaux}, MATCH(1, {plage_clt}, 0))=0), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
             f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", ""))'
+            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", "")), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente")'
         )
         form_silver = (
-            f'=IF(OR(ISNA(MATCH(2, {plage_clt}, 0)), INDEX({plage_totaux}, MATCH(2, {plage_clt}, 0))=0), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
+            f'=IFERROR(IF(OR(SUM({plage_totaux})=0, INDEX({plage_totaux}, MATCH(2, {plage_clt}, 0))=0), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
             f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", ""))'
+            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", "")), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente")'
         )
     else:
         form_gold = (
-            f'=IF(OR(ISNA(MATCH(1, {plage_clt}, 0)), SUM({plage_totaux})=0), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
+            f'=IFERROR(IF(SUM({plage_totaux})=0, "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
             f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", ""))'
+            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", "")), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente")'
         )
         form_silver = (
-            f'=IF(OR(ISNA(MATCH(2, {plage_clt}, 0)), SUM({plage_totaux})=0), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
+            f'=IFERROR(IF(SUM({plage_totaux})=0, "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
             f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", ""))'
+            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", "")), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente")'
         )
     
     draw_excel_podium_card(ws, 4, col_pod, "🥇 CHAMPION (OR)", "En attente", fill_gold, font_color="B45309", formula_val=form_gold)
@@ -2954,9 +2954,9 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
     
     if len(liste_p) >= 3:
         form_bronze = (
-            f'=IF(OR(ISNA(MATCH(3, {plage_clt}, 0)), INDEX({plage_totaux}, MATCH(3, {plage_clt}, 0))=0), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente", '
+            f'=IFERROR(IF(OR(SUM({plage_totaux})=0, INDEX({plage_totaux}, MATCH(3, {plage_clt}, 0))=0), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente", '
             f'"🥉 3ème PLACE (BRONZE)" & CHAR(10) & INDEX({plage_nom}, MATCH(3, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(3, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(3, {plage_clt}, 0)) & ")", ""))'
+            f'IF(INDEX({plage_club}, MATCH(3, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(3, {plage_clt}, 0)) & ")", "")), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente")'
         )
         draw_excel_podium_card(ws, 10, col_pod, "🥉 3ème PLACE (BRONZE)", "En attente", fill_bronze, font_color="9A3412", formula_val=form_bronze)
 

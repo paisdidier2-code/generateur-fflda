@@ -4390,9 +4390,12 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             r += 1
             
         if lutteurs_poule:
-            if all(p.get("Clt_Excel") is not None for p in lutteurs_poule):
+            if any(p.get("Clt_Excel") is not None for p in lutteurs_poule):
                 for p in lutteurs_poule:
-                    p["Clt"] = p["Clt_Excel"]
+                    if p.get("Clt_Excel") is not None:
+                        p["Clt"] = p["Clt_Excel"]
+                    else:
+                        p["Clt"] = "NR"
             elif sum(p.get("Points", 0) for p in lutteurs_poule) > 0:
                 sorted_p = sorted(lutteurs_poule, key=lambda x: x["Points"], reverse=True)
                 cur_rank = 1

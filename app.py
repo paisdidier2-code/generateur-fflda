@@ -4475,8 +4475,9 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     clt_cleaned = nettoyer_rang(clt_raw)
                     clt_val = clt_cleaned if isinstance(clt_cleaned, int) else None
 
-                    # Recherche dans les cartes podium si disponible
-                    if clt_val is None and podium_cards:
+                    # Priorité absolue aux cartes podium / médailles si présentes (Tableaux U13 et 2 Poules)
+                    if podium_cards:
+                        podium_match = None
                         norm_p_nom = normaliser_nom_comparaison(nom)
                         nom_parts = nom.strip().split()
                         norm_nom_famille = normaliser_nom_comparaison(nom_parts[0]) if nom_parts else ""
@@ -4484,18 +4485,23 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                         if 1 in podium_cards:
                             txt_p = normaliser_nom_comparaison(podium_cards[1])
                             if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
-                                clt_val = 1
-                        if clt_val is None and 2 in podium_cards:
+                                podium_match = 1
+                        if podium_match is None and 2 in podium_cards:
                             txt_p = normaliser_nom_comparaison(podium_cards[2])
                             if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
-                                clt_val = 2
-                        if clt_val is None and 3 in podium_cards:
+                                podium_match = 2
+                        if podium_match is None and 3 in podium_cards:
                             b_list = podium_cards[3] if isinstance(podium_cards[3], list) else [podium_cards[3]]
                             for b_txt in b_list:
                                 txt_p = normaliser_nom_comparaison(b_txt)
                                 if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
-                                    clt_val = 3
+                                    podium_match = 3
                                     break
+
+                        if podium_match is not None:
+                            clt_val = podium_match
+                        else:
+                            clt_val = None
 
                     lutteurs_poule.append({
                         "Poule": nom_feuille,

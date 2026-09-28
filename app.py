@@ -35,6 +35,13 @@ def verifier_code_acces(code_saisi, url_csv):
         
     if not url_csv or "http" not in url_csv:
         return True, "Code validé (mode démo sans tableau Google Sheets)."
+
+    # Conversion automatique de n'importe quel lien Google Sheets classique vers le format CSV
+    if "docs.google.com/spreadsheets" in url_csv:
+        if "/edit" in url_csv:
+            url_csv = re.sub(r'/edit.*$', '/export?format=csv', url_csv)
+        elif not ("output=csv" in url_csv or "format=csv" in url_csv):
+            url_csv = url_csv.rstrip("/") + "/export?format=csv"
         
     try:
         # Chargement dynamique du tableau Google Sheets
@@ -108,6 +115,15 @@ with st.sidebar:
             st.image("logo_fflda.png", use_container_width=True)
         else:
             st.image("https://www.fflutte.com/content/uploads/2021/10/fflutte-bleu-1024x842.png", use_container_width=True)
+    if st.session_state.get("authentifie"):
+        col_s1, col_s2 = st.columns([3, 1])
+        with col_s1:
+            st.caption("🟢 **Session active**")
+        with col_s2:
+            if st.button("🔒", help="Se déconnecter de l'application"):
+                st.session_state["authentifie"] = False
+                st.rerun()
+
     st.markdown("### Paramètres du tournoi")
     st.markdown("---")
     

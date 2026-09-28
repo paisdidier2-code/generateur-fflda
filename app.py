@@ -225,10 +225,6 @@ with st.sidebar:
         duree_u11 = st.number_input("Temps total U11 (min)", value=4)
         duree_u13 = st.number_input("Temps total U13 (min)", value=5)
 
-    with st.expander("💳 4. Tarification & Facturation (Admin)", expanded=False):
-        prix_inscrit_in = st.number_input("Tarif par inscrit (€)", value=float(st.session_state.get("prix_par_inscrit", 0.50)), min_value=0.0, step=0.05, format="%.2f", key="sidebar_prix_par_inscrit")
-        st.session_state["prix_par_inscrit"] = prix_inscrit_in
-
     # JavaScript pour le comportement d'accordéon à ouverture unique (ferme les autres au clic)
     components.html("""
     <script>

@@ -4260,13 +4260,37 @@ if mode_app.startswith("2"):
                     ws.page_setup.fitToWidth = 1
                     ws.page_setup.fitToHeight = 0
 
+            # Génération du PDF officiel du bilan (A4 Portrait - Format Excel FFLDA)
+            pdf_bilan_bytes = None
+            try:
+                wb_bilan_excel = openpyxl.load_workbook(io.BytesIO(output_bilan.getvalue()), data_only=True)
+                pdf_bilan_bytes = generer_pdf_depuis_classeur_excel(wb_bilan_excel, nom_competition, wb=wb_bilan_excel)
+            except Exception as e_pdf_b:
+                st.warning(f"⚠️ Information : génération PDF du Bilan : {e_pdf_b}")
+                pdf_bilan_bytes = None
+
             st.markdown("---")
-            st.download_button(
-                label="📥 Télécharger le Bilan Officiel FFLDA (Excel)",
-                data=output_bilan.getvalue(),
-                file_name="Bilan_Officiel_FFLDA.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            st.markdown("### 📥 Téléchargements Complets du Bilan Officiel (Formats FFLDA)")
+            col_bil_pdf, col_bil_xl = st.columns(2)
+            with col_bil_pdf:
+                if pdf_bilan_bytes:
+                    st.download_button(
+                        label="📄 Télécharger le Bilan Officiel en PDF (A4 Portrait - Format Excel)",
+                        data=pdf_bilan_bytes,
+                        file_name=f"Bilan_Officiel_{nom_competition.replace(' ', '_')}.pdf",
+                        mime="application/pdf",
+                        key="btn_pdf_bilan"
+                    )
+                else:
+                    st.info("Le PDF du bilan est en cours de préparation...")
+            with col_bil_xl:
+                st.download_button(
+                    label="📥 Télécharger le Bilan Officiel Excel (.xlsx)",
+                    data=output_bilan.getvalue(),
+                    file_name=f"Bilan_Officiel_{nom_competition.replace(' ', '_')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="btn_excel_bilan"
+                )
 
         except Exception as e:
             st.error(f"Erreur lors de l'analyse du fichier : {e}")

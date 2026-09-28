@@ -4198,6 +4198,15 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                 pass
         return " ".join(parts) if parts else txt_form
 
+    def normaliser_nom_comparaison(txt):
+        if not txt:
+            return ""
+        import unicodedata
+        txt = re.sub(r'[🔴🔵🥇🥈🥉🏆🛡️]|\([^\)]*\)', ' ', str(txt))
+        txt_nfkd = unicodedata.normalize('NFD', txt)
+        txt_sans_accents = "".join([c for c in txt_nfkd if unicodedata.category(c) != 'Mn'])
+        return re.sub(r'[^a-z0-9]', '', txt_sans_accents.lower())
+
     for nom_feuille in onglets_poules:
         ws = wb_data[nom_feuille]
         ws_f = wb_formula[nom_feuille] if (wb_formula and nom_feuille in wb_formula.sheetnames) else None
@@ -4302,12 +4311,17 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             # Attribution des rangs officiels depuis le podium Excel
             for p in participants_croisees:
                 p_nom = p["Nom"]
-                clt_final = None
+                norm_p_nom = normaliser_nom_comparaison(p_nom)
+                nom_parts = p_nom.strip().split()
+                norm_nom_famille = normaliser_nom_comparaison(nom_parts[0]) if nom_parts else ""
                 
-                for rg, txt_pod in podium_croisees.items():
-                    if p_nom.lower() in txt_pod.lower():
-                        clt_final = rg
-                        break
+                clt_final = None
+                for rg in [1, 2, 3]:
+                    if rg in podium_croisees:
+                        txt_p = normaliser_nom_comparaison(podium_croisees[rg])
+                        if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
+                            clt_final = rg
+                            break
                 
                 if clt_final is None:
                     try:
@@ -4392,15 +4406,27 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             
             for p in participants_tableau:
                 p_nom = p["Nom"]
+                norm_p_nom = normaliser_nom_comparaison(p_nom)
+                nom_parts = p_nom.strip().split()
+                norm_nom_famille = normaliser_nom_comparaison(nom_parts[0]) if nom_parts else ""
+                
                 clt = None
-                if 1 in podium_tableau and p_nom.lower() in podium_tableau[1].lower():
-                    clt = 1
-                elif 2 in podium_tableau and p_nom.lower() in podium_tableau[2].lower():
-                    clt = 2
-                elif 3 in podium_tableau:
+                
+                if 1 in podium_tableau:
+                    txt_p = normaliser_nom_comparaison(podium_tableau[1])
+                    if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
+                        clt = 1
+                
+                if clt is None and 2 in podium_tableau:
+                    txt_p = normaliser_nom_comparaison(podium_tableau[2])
+                    if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
+                        clt = 2
+                
+                if clt is None and 3 in podium_tableau:
                     b_list = podium_tableau[3] if isinstance(podium_tableau[3], list) else [podium_tableau[3]]
                     for b_txt in b_list:
-                        if p_nom.lower() in b_txt.lower():
+                        txt_p = normaliser_nom_comparaison(b_txt)
+                        if (norm_p_nom and norm_p_nom in txt_p) or (len(norm_nom_famille) >= 3 and norm_nom_famille in txt_p):
                             clt = 3
                             break
                 
@@ -4509,21 +4535,35 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             r += 1
             
         if lutteurs_poule:
-            if any(p.get("Clt_Excel") is not None for p in lutteurs_poule):
-                for p in lutteurs_poule:
-                    if p.get("Clt_Excel") is not None:
-                        p["Clt"] = p["Clt_Excel"]
-                    else:
-                        p["Clt"] = "NR"
-            elif sum(p.get("Points", 0) for p in lutteurs_poule) > 0:
-                sorted_p = sorted(lutteurs_poule, key=lambda x: x["Points"], reverse=True)
+            total_pts_poule = sum(p.get("Points", 0) for p in lutteurs_poule)
+            has_any_clt = any(p.get("Clt_Excel") is not None for p in lutteurs_poule)
+            
+            if has_any_clt or total_pts_poule > 0:
+                sorted_p = sorted(
+                    lutteurs_poule, 
+                    key=lambda x: (
+                        x["Clt_Excel"] if x.get("Clt_Excel") is not None else 999, 
+                        -x.get("Points", 0)
+                    )
+                )
+                
                 cur_rank = 1
                 for idx, p in enumerate(sorted_p):
-                    if idx > 0 and p["Points"] == sorted_p[idx-1]["Points"]:
-                        p["Clt"] = sorted_p[idx-1]["Clt"]
+                    if p.get("Clt_Excel") is not None:
+                        p["Clt"] = p["Clt_Excel"]
+                        try:
+                            cur_rank = max(cur_rank, int(p["Clt_Excel"]) + 1)
+                        except (ValueError, TypeError):
+                            pass
                     else:
-                        p["Clt"] = cur_rank
-                    cur_rank += 1
+                        if total_pts_poule > 0:
+                            if idx > 0 and sorted_p[idx-1].get("Clt") is not None and sorted_p[idx-1].get("Clt") != "NR" and p.get("Points", 0) == sorted_p[idx-1].get("Points", 0):
+                                p["Clt"] = sorted_p[idx-1]["Clt"]
+                            else:
+                                p["Clt"] = cur_rank
+                                cur_rank += 1
+                        else:
+                            p["Clt"] = "NR"
             else:
                 for p in lutteurs_poule:
                     p["Clt"] = "NR"
@@ -4634,59 +4674,25 @@ if mode_app.startswith("2"):
                         elif clt_num == 3: points_comites[comite]["3èmes"] += 1
                         elif clt_num == 4: points_comites[comite]["4èmes"] += 1
 
-            # Priorité absolue si le classeur Excel contenait déjà une feuille "Classement Clubs"
-            feuille_clubs_trouvee = False
-            for s_name in wb_res.sheetnames:
-                if any(k in s_name.lower() for k in ["classement club", "classement des clubs", "bilan club"]):
-                    ws_c = wb_res[s_name]
-                    headers_c = [str(ws_c.cell(row=5, column=c).value or "").strip() for c in range(1, ws_c.max_column + 1)]
-                    if any("club" in h.lower() for h in headers_c):
-                        rows_c = []
-                        for r_i in range(6, ws_c.max_row + 1):
-                            if ws_c.cell(row=r_i, column=2).value is not None:
-                                rows_c.append([ws_c.cell(row=r_i, column=c).value for c in range(1, len(headers_c) + 1)])
-                        if rows_c:
-                            df_clubs = pd.DataFrame(rows_c, columns=headers_c)
-                            feuille_clubs_trouvee = True
-                    break
+            if points_clubs:
+                df_clubs = pd.DataFrame(list(points_clubs.values())).sort_values(
+                    by=["Points Club", "1ers", "2èmes", "3èmes", "4èmes"], 
+                    ascending=False
+                ).reset_index(drop=True)
+                df_clubs.index = range(1, len(df_clubs) + 1)
+                df_clubs.insert(0, "Clt Club", df_clubs.index)
+            else:
+                df_clubs = pd.DataFrame(columns=["Clt Club", "Club", "Points Club", "1ers", "2èmes", "3èmes", "4èmes"])
 
-            if not feuille_clubs_trouvee:
-                if points_clubs:
-                    df_clubs = pd.DataFrame(list(points_clubs.values())).sort_values(
-                        by=["Points Club", "1ers", "2èmes", "3èmes", "4èmes"], 
-                        ascending=False
-                    ).reset_index(drop=True)
-                    df_clubs.index = range(1, len(df_clubs) + 1)
-                    df_clubs.insert(0, "Clt Club", df_clubs.index)
-                else:
-                    df_clubs = pd.DataFrame(columns=["Clt Club", "Club", "Points Club", "1ers", "2èmes", "3èmes", "4èmes"])
-
-            # Priorité absolue si le classeur Excel contenait déjà une feuille "Classement Comités"
-            feuille_comites_trouvee = False
-            for s_name in wb_res.sheetnames:
-                if any(k in s_name.lower() for k in ["classement comit", "comités régionaux", "bilan comit"]):
-                    ws_com = wb_res[s_name]
-                    headers_com = [str(ws_com.cell(row=5, column=c).value or "").strip() for c in range(1, ws_com.max_column + 1)]
-                    if any("comité" in h.lower() or "comite" in h.lower() for h in headers_com):
-                        rows_com = []
-                        for r_i in range(6, ws_com.max_row + 1):
-                            if ws_com.cell(row=r_i, column=2).value is not None:
-                                rows_com.append([ws_com.cell(row=r_i, column=c).value for c in range(1, len(headers_com) + 1)])
-                        if rows_com:
-                            df_comites = pd.DataFrame(rows_com, columns=headers_com)
-                            feuille_comites_trouvee = True
-                    break
-
-            if not feuille_comites_trouvee:
-                if points_comites:
-                    df_comites = pd.DataFrame(list(points_comites.values())).sort_values(
-                        by=["Points Comité", "1ers", "2èmes", "3èmes", "4èmes"], 
-                        ascending=False
-                    ).reset_index(drop=True)
-                    df_comites.index = range(1, len(df_comites) + 1)
-                    df_comites.insert(0, "Clt Comité", df_comites.index)
-                else:
-                    df_comites = pd.DataFrame(columns=["Clt Comité", "Comité Régional", "Points Comité", "1ers", "2èmes", "3èmes", "4èmes"])
+            if points_comites:
+                df_comites = pd.DataFrame(list(points_comites.values())).sort_values(
+                    by=["Points Comité", "1ers", "2èmes", "3èmes", "4èmes"], 
+                    ascending=False
+                ).reset_index(drop=True)
+                df_comites.index = range(1, len(df_comites) + 1)
+                df_comites.insert(0, "Clt Comité", df_comites.index)
+            else:
+                df_comites = pd.DataFrame(columns=["Clt Comité", "Comité Régional", "Points Comité", "1ers", "2èmes", "3èmes", "4èmes"])
 
             # --- ONGLETS D'AFFICHAGE DU BILAN OFFICIEL ---
             tab_bilan_1, tab_bilan_2, tab_bilan_3 = st.tabs([
@@ -4707,12 +4713,12 @@ if mode_app.startswith("2"):
             with tab_bilan_2:
                 st.subheader(f"🛡️ Podium des Clubs Engagés — {nom_comp_officiel}")
                 st.markdown("*Barème officiel FFLDA : 1er = 4 pts | 2ème = 3 pts | 3ème = 2 pts | 4ème = 1 pt*")
-                st.table(df_clubs)
+                st.dataframe(df_clubs, use_container_width=True, hide_index=True)
 
             with tab_bilan_3:
                 st.subheader(f"🏛️ Classement Officiel des Comités Régionaux — {nom_comp_officiel}")
                 st.markdown("*Barème officiel FFLDA : 1er = 4 pts | 2ème = 3 pts | 3ème = 2 pts | 4ème = 1 pt*")
-                st.table(df_comites)
+                st.dataframe(df_comites, use_container_width=True, hide_index=True)
 
             # Intégration des feuilles officielles de Bilan directement dans le classeur Excel officiel
             if "Classement Clubs" in wb_res.sheetnames:

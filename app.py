@@ -89,6 +89,8 @@ def verifier_code_acces(code_saisi, url_csv):
     except Exception as e:
         return False, f"⚠️ Erreur lors de la vérification du code : {e}"
 
+URL_BILLING_WEBHOOK_DEFAUT = "https://script.google.com/macros/s/AKfycbyxLjHY-YXzT8ZAYdKpM-JmWD42SwlyVL3Dn_VX-HgT6M1qHidVL5iLmM7JF2T7Fi5P/exec"
+
 def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_peses, nb_matchs):
     """
     Transmet silencieusement en arrière-plan les métriques de facturation vers le webhook ou Google Form.
@@ -96,11 +98,11 @@ def enregistrer_log_facturation(code_organisateur, nom_tournoi, nb_inscrits, nb_
     try:
         url_webhook = None
         try:
-            url_webhook = st.secrets.get("BILLING_WEBHOOK_URL", "")
+            url_webhook = st.secrets.get("BILLING_WEBHOOK_URL", URL_BILLING_WEBHOOK_DEFAUT)
         except Exception:
             pass
         if not url_webhook:
-            url_webhook = st.session_state.get("url_billing_webhook", "")
+            url_webhook = st.session_state.get("url_billing_webhook", URL_BILLING_WEBHOOK_DEFAUT)
             
         if not url_webhook or "http" not in url_webhook:
             return
@@ -146,7 +148,7 @@ if not st.session_state["authentifie"]:
         with st.expander("⚙️ Configuration des accès & Facturation (Administrateur)", expanded=False):
             url_gsheets_in = st.text_input("URL du tableau Google Sheets (publié en CSV)", value=st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
             st.session_state["url_gsheets_config"] = url_gsheets_in
-            url_billing_in = st.text_input("URL Webhook de facturation (Optionnel)", value=st.session_state.get("url_billing_webhook", ""))
+            url_billing_in = st.text_input("URL Webhook de facturation (Optionnel)", value=st.session_state.get("url_billing_webhook", URL_BILLING_WEBHOOK_DEFAUT))
             st.session_state["url_billing_webhook"] = url_billing_in
         
         if st.button("🚀 Se Connecter", use_container_width=True):

@@ -146,14 +146,8 @@ if not st.session_state["authentifie"]:
         
         code_saisi = st.text_input("🔑 Code d'accès", type="password", placeholder="Ex: PARIS-24H")
         
-        with st.expander("⚙️ Configuration des accès & Facturation (Administrateur)", expanded=False):
-            url_gsheets_in = st.text_input("URL du tableau Google Sheets (publié en CSV)", value=st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
-            st.session_state["url_gsheets_config"] = url_gsheets_in
-            url_billing_in = st.text_input("URL Webhook de facturation", value=st.session_state.get("url_billing_webhook", URL_BILLING_WEBHOOK_DEFAUT))
-            st.session_state["url_billing_webhook"] = url_billing_in
-        
         if st.button("🚀 Se Connecter", use_container_width=True):
-            valide, message = verifier_code_acces(code_saisi, st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
+            valide, message = verifier_code_acces(code_saisi, URL_GOOGLE_SHEETS_DEFAUT)
             if valide:
                 st.session_state["authentifie"] = True
                 st.session_state["code_session"] = code_saisi.strip().upper()
@@ -170,7 +164,7 @@ if not st.session_state["authentifie"]:
 if st.session_state.get("authentifie"):
     code_sess = st.session_state.get("code_session", "")
     if code_sess not in ["FFLDA-ADMIN", "FFLDA2026"]:
-        valide_encore, msg_exp = verifier_code_acces(code_sess, st.session_state.get("url_gsheets_config", URL_GOOGLE_SHEETS_DEFAUT))
+        valide_encore, msg_exp = verifier_code_acces(code_sess, URL_GOOGLE_SHEETS_DEFAUT)
         if not valide_encore:
             st.session_state["authentifie"] = False
             st.error(f"⏰ {msg_exp}")

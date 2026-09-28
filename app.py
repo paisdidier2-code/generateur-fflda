@@ -3924,6 +3924,293 @@ def bouton_imprimer(html_data=None, filename="Fiche_Impression_Paysage.html", la
         """
         components.html(print_code, height=50)
 
+def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
+    """
+    Extrait l'intégralité des résultats et classements officiels directement depuis le classeur Excel
+    fourni par l'utilisateur (format officiel FFLDA).
+    Gère les Poules Nordiques, Tableaux à élimination directe U13, Poules Croisées et Plateaux U7.
+    """
+    tous_les_resultats = []
+    
+    # Filtrer les onglets de compétition (exclure Résumé, Grille de passage, et feuilles de bilan préexistantes)
+    onglets_poules = [
+        f for f in wb_data.sheetnames 
+        if not any(x in f.lower() for x in ["résumé", "resume", "grille", "classement clubs", "classement comités", "classements individuels", "classement général", "bilan"])
+    ]
+    
+    # Tri officiel des onglets : U7 d'abord, puis U9, U11, U13
+    onglets_poules.sort(key=lambda x: (
+        0 if "u7" in x.lower() else (1 if "u9" in x.lower() else (2 if "u11" in x.lower() else 3)),
+        x
+    ))
+    
+    def formater_poids_local(val):
+        if val is None or str(val).strip() in ['', 'None', 'nan']:
+            return ''
+        try:
+            val_float = float(str(val).replace(',', '.'))
+            if val_float == int(val_float):
+                return int(val_float)
+            else:
+                return round(val_float, 1)
+        except (ValueError, TypeError):
+            return val
+
+    for nom_feuille in onglets_poules:
+        ws = wb_data[nom_feuille]
+        
+        titre_feuille = ""
+        for r_t in range(1, 4):
+            val_t = str(ws.cell(row=r_t, column=1).value or "").strip()
+            if val_t:
+                titre_feuille = val_t
+                break
+        
+        titre_lower = (titre_feuille + " " + nom_feuille).lower()
+        
+        # --- CAS A : PLATEAU U7 ---
+        if "u7" in titre_lower or "plateau" in titre_lower:
+            r = 5
+            while ws.cell(row=r, column=2).value is not None:
+                nom = str(ws.cell(row=r, column=2).value).strip()
+                club = str(ws.cell(row=r, column=3).value or "Indépendant").strip()
+                poids = formater_poids_local(ws.cell(row=r, column=4).value)
+                
+                tous_les_resultats.append({
+                    "Poule": nom_feuille,
+                    "Nom": nom,
+                    "Club": club if club not in ["", "-", "None"] else "Indépendant",
+                    "Comité": "Comité Non Renseigné",
+                    "Poids": poids,
+                    "Points": 0,
+                    "Clt": 1  # Tous récompensés en U7 FFLDA
+                })
+                r += 1
+            continue
+
+        # --- CAS B : POULES CROISÉES U13 (6 lutteurs : Poule A + Poule B + Finales) ---
+        if "crois" in titre_lower or "2 poules" in titre_lower or "poule a" in str(ws.cell(row=4, column=1).value or "").lower():
+            participants_croisees = []
+            
+            # Repérage podium final depuis les cartes podium
+            podium_croisees = {}
+            for r_c in range(1, min(ws.max_row + 1, 30)):
+                for c_c in range(1, min(ws.max_column + 1, 25)):
+                    v_cell = str(ws.cell(row=r_c, column=c_c).value or "").strip()
+                    if "🥇" in v_cell or "OR" in v_cell:
+                        podium_croisees[1] = v_cell
+                    elif "🥈" in v_cell or "ARGENT" in v_cell:
+                        podium_croisees[2] = v_cell
+                    elif "🥉" in v_cell or "BRONZE" in v_cell:
+                        podium_croisees[3] = v_cell
+            
+            # Lecture Poule A
+            for r_a in range(6, 9):
+                nom_a = ws.cell(row=r_a, column=3).value
+                if nom_a:
+                    club_a = str(ws.cell(row=r_a, column=4).value or "Indépendant").strip()
+                    pts_a = ws.cell(row=r_a, column=8).value
+                    clt_a = ws.cell(row=r_a, column=1).value
+                    participants_croisees.append({
+                        "Nom": str(nom_a).strip(), "Club": club_a, "Poule_Sub": "A", 
+                        "Points": pts_a, "Clt_Poule": clt_a, "Row": r_a
+                    })
+            
+            # Lecture Poule B
+            for r_b in range(12, 15):
+                nom_b = ws.cell(row=r_b, column=3).value
+                if nom_b:
+                    club_b = str(ws.cell(row=r_b, column=4).value or "Indépendant").strip()
+                    pts_b = ws.cell(row=r_b, column=8).value
+                    clt_b = ws.cell(row=r_b, column=1).value
+                    participants_croisees.append({
+                        "Nom": str(nom_b).strip(), "Club": club_b, "Poule_Sub": "B", 
+                        "Points": pts_b, "Clt_Poule": clt_b, "Row": r_b
+                    })
+            
+            # Attribution des rangs officiels depuis le podium Excel
+            for p in participants_croisees:
+                p_nom = p["Nom"]
+                clt_final = None
+                
+                for rg, txt_pod in podium_croisees.items():
+                    if p_nom.lower() in txt_pod.lower():
+                        clt_final = rg
+                        break
+                
+                if clt_final is None:
+                    try:
+                        c_p = int(p["Clt_Poule"])
+                        if c_p == 3: clt_final = 5
+                        elif c_p == 2: clt_final = 4
+                        elif c_p == 1: clt_final = 2
+                    except (ValueError, TypeError):
+                        clt_final = "NR"
+                
+                try:
+                    pts_val = int(round(float(p["Points"]))) if p["Points"] is not None else 0
+                except (ValueError, TypeError):
+                    pts_val = 0
+                
+                tous_les_resultats.append({
+                    "Poule": nom_feuille,
+                    "Nom": p["Nom"],
+                    "Club": p["Club"],
+                    "Comité": "Comité Non Renseigné",
+                    "Poids": "",
+                    "Points": pts_val,
+                    "Clt": clt_final
+                })
+            continue
+
+        # --- CAS C : TABLEAU U13 (Élimination directe avec repêchage) ---
+        if "tableau" in titre_lower or (ws.cell(row=4, column=1).value == "N°" and "nom" in str(ws.cell(row=4, column=2).value or "").lower()):
+            participants_tableau = []
+            r = 5
+            while ws.cell(row=r, column=2).value is not None:
+                nom = str(ws.cell(row=r, column=2).value).strip()
+                club = str(ws.cell(row=r, column=3).value or "Indépendant").strip()
+                poids = formater_poids_local(ws.cell(row=r, column=4).value)
+                participants_tableau.append({
+                    "Nom": nom,
+                    "Club": club if club not in ["", "-", "None"] else "Indépendant",
+                    "Poids": poids,
+                    "Clt": None
+                })
+                r += 1
+            
+            podium_tableau = {}
+            for r_c in range(1, min(ws.max_row + 1, 60)):
+                for c_c in range(5, min(ws.max_column + 1, 40)):
+                    v_cell = str(ws.cell(row=r_c, column=c_c).value or "").strip()
+                    if not v_cell or v_cell.startswith("="):
+                        continue
+                    if "🥇" in v_cell or "CHAMPION (OR)" in v_cell:
+                        podium_tableau[1] = v_cell
+                    elif "🥈" in v_cell or "VICE-CHAMPION" in v_cell:
+                        podium_tableau[2] = v_cell
+                    elif "🥉" in v_cell or "Bronze 1" in v_cell or "BRONZE" in v_cell:
+                        if 3 not in podium_tableau:
+                            podium_tableau[3] = [v_cell]
+                        else:
+                            if isinstance(podium_tableau[3], list):
+                                podium_tableau[3].append(v_cell)
+                            else:
+                                podium_tableau[3] = [podium_tableau[3], v_cell]
+            
+            for p in participants_tableau:
+                p_nom = p["Nom"]
+                clt = None
+                if 1 in podium_tableau and p_nom.lower() in podium_tableau[1].lower():
+                    clt = 1
+                elif 2 in podium_tableau and p_nom.lower() in podium_tableau[2].lower():
+                    clt = 2
+                elif 3 in podium_tableau:
+                    b_list = podium_tableau[3] if isinstance(podium_tableau[3], list) else [podium_tableau[3]]
+                    for b_txt in b_list:
+                        if p_nom.lower() in b_txt.lower():
+                            clt = 3
+                            break
+                
+                if clt is None:
+                    clt = "NR" if not podium_tableau else 5
+                
+                tous_les_resultats.append({
+                    "Poule": nom_feuille,
+                    "Nom": p["Nom"],
+                    "Club": p["Club"],
+                    "Comité": "Comité Non Renseigné",
+                    "Poids": p["Poids"],
+                    "Points": 0,
+                    "Clt": clt
+                })
+            continue
+
+        # --- CAS D : POULE NORDIQUE STANDARD (U9, U11, U13 petites poules) ---
+        h_row = 4
+        col_clt = 1
+        col_nom = 3
+        col_club = 4
+        col_comite = None
+        col_total_pts = None
+        col_poids = None
+        
+        for r_search in [4, 5, 3]:
+            for c_idx in range(1, ws.max_column + 1):
+                val_h = str(ws.cell(row=r_search, column=c_idx).value or "").strip().lower()
+                if "clt" in val_h or "rang" in val_h:
+                    col_clt = c_idx
+                    h_row = r_search
+                elif "nom" in val_h:
+                    col_nom = c_idx
+                    h_row = r_search
+                elif "club" in val_h:
+                    col_club = c_idx
+                elif any(k in val_h for k in ["comité", "comite", "ligue", "région", "region", "c.r."]):
+                    col_comite = c_idx
+                elif "total pts" in val_h or val_h == "pts":
+                    col_total_pts = c_idx
+                elif "poids" in val_h:
+                    col_poids = c_idx
+            if col_nom and (col_total_pts or col_club):
+                break
+        
+        r = h_row + 1
+        lutteurs_poule = []
+        while ws.cell(row=r, column=col_nom).value is not None:
+            nom = ws.cell(row=r, column=col_nom).value
+            club = ws.cell(row=r, column=col_club).value if col_club else "Indépendant"
+            comite_val = ws.cell(row=r, column=col_comite).value if col_comite else None
+            comite = str(comite_val).strip() if (comite_val and str(comite_val).strip() not in ["", "None", "nan", "-"]) else "Comité Non Renseigné"
+            
+            total_pts = ws.cell(row=r, column=col_total_pts).value if col_total_pts else 0
+            poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
+            poids_val = formater_poids_local(poids_raw)
+            
+            try:
+                pts_val = int(round(float(total_pts))) if total_pts is not None else 0
+            except (ValueError, TypeError):
+                pts_val = 0
+            
+            clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
+            try:
+                clt_val = int(float(str(clt_raw).strip())) if clt_raw is not None and str(clt_raw).strip() not in ['', 'NR', 'None', '-'] else None
+            except (ValueError, TypeError):
+                clt_val = None
+                
+            lutteurs_poule.append({
+                "Poule": nom_feuille,
+                "Nom": str(nom).strip(),
+                "Club": str(club).strip() if club else "Indépendant",
+                "Comité": comite,
+                "Poids": poids_val,
+                "Points": pts_val,
+                "Clt_Excel": clt_val
+            })
+            r += 1
+            
+        if lutteurs_poule:
+            if all(p.get("Clt_Excel") is not None for p in lutteurs_poule):
+                for p in lutteurs_poule:
+                    p["Clt"] = p["Clt_Excel"]
+            elif sum(p.get("Points", 0) for p in lutteurs_poule) > 0:
+                sorted_p = sorted(lutteurs_poule, key=lambda x: x["Points"], reverse=True)
+                cur_rank = 1
+                for idx, p in enumerate(sorted_p):
+                    if idx > 0 and p["Points"] == sorted_p[idx-1]["Points"]:
+                        p["Clt"] = sorted_p[idx-1]["Clt"]
+                    else:
+                        p["Clt"] = cur_rank
+                    cur_rank += 1
+            else:
+                for p in lutteurs_poule:
+                    p["Clt"] = "NR"
+                    
+            tous_les_resultats.extend(lutteurs_poule)
+            
+    return tous_les_resultats
+
+
 # Sélection du mode de travail
 col_mode1, col_mode2 = st.columns([2, 3])
 with col_mode1:
@@ -3931,105 +4218,37 @@ with col_mode1:
 
 if mode_app.startswith("2"):
     st.markdown("### 📂 Module de Fin de Tournoi & Bilans Fédéraux")
-    st.info(f"Importez votre fichier Excel complété pour la compétition **{nom_competition}** afin de générer automatiquement les classements officiels individuels et par club.")
+    st.info(f"Importez votre fichier Excel complété pour la compétition **{nom_competition}** afin de générer automatiquement les classements officiels individuels et par club basés sur les données du fichier.")
     
     fichier_resultats = st.file_uploader("Sélectionner le fichier Excel complété (.xlsx)", type=["xlsx"])
     
     if fichier_resultats is not None:
         try:
             wb_res = openpyxl.load_workbook(fichier_resultats, data_only=True)
-            st.success("✨ Fichier de résultats analysé avec succès !")
+            fichier_resultats.seek(0)
+            try:
+                wb_f = openpyxl.load_workbook(fichier_resultats, data_only=False)
+            except Exception:
+                wb_f = None
             
-            tous_les_resultats = []
-            onglets_poules = [f for f in wb_res.sheetnames if not any(x in f for x in ["Résumé", "Grille", "Classement Général"])]
-            onglets_poules.sort(key=lambda x: (0 if "U7" in x.upper() else (1 if "U9" in x.upper() else (2 if "U11" in x.upper() else 3)), x))
+            # Recherche dynamique du nom de la compétition dans le fichier Excel
+            nom_comp_detecte = None
+            for s_name in wb_res.sheetnames:
+                ws_chk = wb_res[s_name]
+                for r_chk in [1, 2]:
+                    val_c = str(ws_chk.cell(row=r_chk, column=1).value or "").strip()
+                    m_comp = re.search(r"COMPÉTITION\s*:\s*([^—\n]+)", val_c, re.IGNORECASE)
+                    if m_comp:
+                        nom_comp_detecte = m_comp.group(1).strip()
+                        break
+                if nom_comp_detecte:
+                    break
+            nom_comp_officiel = nom_comp_detecte if nom_comp_detecte else nom_competition
             
-            for nom_feuille in onglets_poules:
-                ws = wb_res[nom_feuille]
-                
-                # --- REPÉRAGE DYNAMIQUE DES COLONNES (Ligne 4 - En-têtes) ---
-                col_total_pts = None
-                col_poids = None
-                col_comite = None
-                for c_idx in range(1, ws.max_column + 1):
-                    val_head = str(ws.cell(row=4, column=c_idx).value or "").strip()
-                    val_lower = val_head.lower()
-                    if val_head == "Total Pts":
-                        col_total_pts = c_idx
-                    elif val_head == "Poids":
-                        col_poids = c_idx
-                    elif any(k in val_lower for k in ["comité", "comite", "ligue", "région", "region", "c.r."]):
-                        col_comite = c_idx
-                
-                r = 5
-                lutteurs_poule = []
-                while ws.cell(row=r, column=3).value is not None:
-                    nom = ws.cell(row=r, column=3).value
-                    club = ws.cell(row=r, column=4).value
-                    comite_val = ws.cell(row=r, column=col_comite).value if col_comite else None
-                    comite = str(comite_val).strip() if (comite_val and str(comite_val).strip() not in ["", "None", "nan", "-"]) else "Comité Non Renseigné"
-                    
-                    total_pts = ws.cell(row=r, column=col_total_pts).value if col_total_pts else 0
-                    poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
-                    
-                    try:
-                        pts_val = int(round(float(total_pts))) if total_pts is not None else 0
-                    except (ValueError, TypeError):
-                        pts_val = 0
-
-                    def formater_poids(val):
-                        if val is None or str(val).strip() in ['', 'None', 'nan']:
-                            return ''
-                        try:
-                            val_float = float(str(val).replace(',', '.'))
-                            if val_float == int(val_float):
-                                return int(val_float)
-                            else:
-                                return round(val_float, 1)
-                        except (ValueError, TypeError):
-                            return val
-
-                    poids_val = formater_poids(poids_raw)
-
-                    clt_excel_raw = ws.cell(row=r, column=1).value
-                    try:
-                        clt_excel = int(float(str(clt_excel_raw).strip())) if clt_excel_raw is not None and str(clt_excel_raw).strip() not in ['', 'NR', 'None'] else None
-                    except (ValueError, TypeError):
-                        clt_excel = None
-
-                    lutteurs_poule.append({
-                        "Poule": nom_feuille,
-                        "Nom": nom,
-                        "Club": club if club else "Indépendant",
-                        "Comité": comite,
-                        "Poids": poids_val,
-                        "Points": pts_val,
-                        "Clt_Excel": clt_excel
-                    })
-                    r += 1
-                
-                df_poule = pd.DataFrame(lutteurs_poule)
-                if not df_poule.empty:
-                    if df_poule["Points"].sum() == 0:
-                        df_poule["Clt"] = "NR"
-                    elif all(p.get("Clt_Excel") is not None for p in lutteurs_poule):
-                        # Classement officiel calculé par la feuille Excel avec départage direct FFLDA
-                        df_poule["Clt"] = [p["Clt_Excel"] for p in lutteurs_poule]
-                        df_poule = df_poule.sort_values(by="Clt").reset_index(drop=True)
-                    else:
-                        df_poule = df_poule.sort_values(by="Points", ascending=False).reset_index(drop=True)
-                        rangs = []
-                        current_rang = 1
-                        for idx, row in df_poule.iterrows():
-                            if idx > 0 and row["Points"] == df_poule.iloc[idx-1]["Points"]:
-                                rangs.append(rangs[-1])
-                            else:
-                                rangs.append(current_rang)
-                            current_rang += 1
-                        df_poule["Clt"] = rangs
-                        
-                    tous_les_resultats.extend(df_poule.to_dict('records'))
-
+            st.success(f"✨ Fichier de résultats analysé avec succès pour : **{nom_comp_officiel}** !")
+            
+            # Extraction des classements directement depuis les feuilles Excel officielles
+            tous_les_resultats = extraire_resultats_classeur_excel(wb_res, wb_f)
             df_bilan = pd.DataFrame(tous_les_resultats)
             
             # --- CALCUL DU CLASSEMENT DES CLUBS ET DES COMITÉS RÉGIONAUX ---
@@ -4053,45 +4272,82 @@ if mode_app.startswith("2"):
                     continue
                 
                 clt_num = int(clt)
-                pts_attribués = bareme_points.get(clt_num, 0)
+                is_u7_poule = "u7" in str(row.get("Poule", "")).lower()
+                pts_attribués = 1 if is_u7_poule else bareme_points.get(clt_num, 0)
                 
                 # Ranking Clubs
                 if club in points_clubs:
                     points_clubs[club]["Points Club"] += pts_attribués
-                    if clt_num == 1: points_clubs[club]["1ers"] += 1
-                    elif clt_num == 2: points_clubs[club]["2èmes"] += 1
-                    elif clt_num == 3: points_clubs[club]["3èmes"] += 1
-                    elif clt_num == 4: points_clubs[club]["4èmes"] += 1
+                    if not is_u7_poule:
+                        if clt_num == 1: points_clubs[club]["1ers"] += 1
+                        elif clt_num == 2: points_clubs[club]["2èmes"] += 1
+                        elif clt_num == 3: points_clubs[club]["3èmes"] += 1
+                        elif clt_num == 4: points_clubs[club]["4èmes"] += 1
 
                 # Ranking Comités Régionaux
                 if comite in points_comites:
                     points_comites[comite]["Points Comité"] += pts_attribués
-                    if clt_num == 1: points_comites[comite]["1ers"] += 1
-                    elif clt_num == 2: points_comites[comite]["2èmes"] += 1
-                    elif clt_num == 3: points_comites[comite]["3èmes"] += 1
-                    elif clt_num == 4: points_comites[comite]["4èmes"] += 1
+                    if not is_u7_poule:
+                        if clt_num == 1: points_comites[comite]["1ers"] += 1
+                        elif clt_num == 2: points_comites[comite]["2èmes"] += 1
+                        elif clt_num == 3: points_comites[comite]["3èmes"] += 1
+                        elif clt_num == 4: points_comites[comite]["4èmes"] += 1
 
-            if points_clubs:
-                df_clubs = pd.DataFrame(list(points_clubs.values())).sort_values(
-                    by=["Points Club", "1ers", "2èmes", "3èmes", "4èmes"], 
-                    ascending=False
-                ).reset_index(drop=True)
-                df_clubs.index = range(1, len(df_clubs) + 1)
-                df_clubs.insert(0, "Clt Club", df_clubs.index)
-            else:
-                df_clubs = pd.DataFrame(columns=["Clt Club", "Club", "Points Club", "1ers", "2èmes", "3èmes", "4èmes"])
+            # Priorité absolue si le classeur Excel contenait déjà une feuille "Classement Clubs"
+            feuille_clubs_trouvee = False
+            for s_name in wb_res.sheetnames:
+                if any(k in s_name.lower() for k in ["classement club", "classement des clubs", "bilan club"]):
+                    ws_c = wb_res[s_name]
+                    headers_c = [str(ws_c.cell(row=5, column=c).value or "").strip() for c in range(1, ws_c.max_column + 1)]
+                    if any("club" in h.lower() for h in headers_c):
+                        rows_c = []
+                        for r_i in range(6, ws_c.max_row + 1):
+                            if ws_c.cell(row=r_i, column=2).value is not None:
+                                rows_c.append([ws_c.cell(row=r_i, column=c).value for c in range(1, len(headers_c) + 1)])
+                        if rows_c:
+                            df_clubs = pd.DataFrame(rows_c, columns=headers_c)
+                            feuille_clubs_trouvee = True
+                    break
 
-            if points_comites:
-                df_comites = pd.DataFrame(list(points_comites.values())).sort_values(
-                    by=["Points Comité", "1ers", "2èmes", "3èmes", "4èmes"], 
-                    ascending=False
-                ).reset_index(drop=True)
-                df_comites.index = range(1, len(df_comites) + 1)
-                df_comites.insert(0, "Clt Comité", df_comites.index)
-            else:
-                df_comites = pd.DataFrame(columns=["Clt Comité", "Comité Régional", "Points Comité", "1ers", "2èmes", "3èmes", "4èmes"])
+            if not feuille_clubs_trouvee:
+                if points_clubs:
+                    df_clubs = pd.DataFrame(list(points_clubs.values())).sort_values(
+                        by=["Points Club", "1ers", "2èmes", "3èmes", "4èmes"], 
+                        ascending=False
+                    ).reset_index(drop=True)
+                    df_clubs.index = range(1, len(df_clubs) + 1)
+                    df_clubs.insert(0, "Clt Club", df_clubs.index)
+                else:
+                    df_clubs = pd.DataFrame(columns=["Clt Club", "Club", "Points Club", "1ers", "2èmes", "3èmes", "4èmes"])
 
-            # --- GÉNÉRATION DU DOCUMENT HTML PAYSAGE POUR IMPRESSION DES BILANS ---
+            # Priorité absolue si le classeur Excel contenait déjà une feuille "Classement Comités"
+            feuille_comites_trouvee = False
+            for s_name in wb_res.sheetnames:
+                if any(k in s_name.lower() for k in ["classement comit", "comités régionaux", "bilan comit"]):
+                    ws_com = wb_res[s_name]
+                    headers_com = [str(ws_com.cell(row=5, column=c).value or "").strip() for c in range(1, ws_com.max_column + 1)]
+                    if any("comité" in h.lower() or "comite" in h.lower() for h in headers_com):
+                        rows_com = []
+                        for r_i in range(6, ws_com.max_row + 1):
+                            if ws_com.cell(row=r_i, column=2).value is not None:
+                                rows_com.append([ws_com.cell(row=r_i, column=c).value for c in range(1, len(headers_com) + 1)])
+                        if rows_com:
+                            df_comites = pd.DataFrame(rows_com, columns=headers_com)
+                            feuille_comites_trouvee = True
+                    break
+
+            if not feuille_comites_trouvee:
+                if points_comites:
+                    df_comites = pd.DataFrame(list(points_comites.values())).sort_values(
+                        by=["Points Comité", "1ers", "2èmes", "3èmes", "4èmes"], 
+                        ascending=False
+                    ).reset_index(drop=True)
+                    df_comites.index = range(1, len(df_comites) + 1)
+                    df_comites.insert(0, "Clt Comité", df_comites.index)
+                else:
+                    df_comites = pd.DataFrame(columns=["Clt Comité", "Comité Régional", "Points Comité", "1ers", "2èmes", "3èmes", "4èmes"])
+
+            # --- ONGLETS D'AFFICHAGE DU BILAN OFFICIEL ---
             tab_bilan_1, tab_bilan_2, tab_bilan_3 = st.tabs([
                 "🏆 Classements Individuels (U7 / U9 / U11 / U13)", 
                 "🛡️ Classement Général des Clubs",
@@ -4099,7 +4355,7 @@ if mode_app.startswith("2"):
             ])
             
             with tab_bilan_1:
-                st.subheader("Classements Individuels Officiels")
+                st.subheader(f"Classements Individuels Officiels — {nom_comp_officiel}")
                 for poule in df_bilan['Poule'].unique():
                     st.markdown(f"#### 🤼 {poule}")
                     sous_df = df_bilan[df_bilan['Poule'] == poule][['Clt', 'Nom', 'Club', 'Poids', 'Points']].copy()
@@ -4107,13 +4363,13 @@ if mode_app.startswith("2"):
                     st.table(sous_df)
 
             with tab_bilan_2:
-                st.subheader("🛡️ Podium des Clubs Engagés")
-                st.markdown("*Barème officiel : 1er = 4 pts | 2ème = 3 pts | 3ème = 2 pts | 4ème = 1 pt*")
+                st.subheader(f"🛡️ Podium des Clubs Engagés — {nom_comp_officiel}")
+                st.markdown("*Barème officiel FFLDA : 1er = 4 pts | 2ème = 3 pts | 3ème = 2 pts | 4ème = 1 pt*")
                 st.table(df_clubs)
 
             with tab_bilan_3:
-                st.subheader("🏛️ Classement Officiel des Comités Régionaux")
-                st.markdown("*Barème officiel : 1er = 4 pts | 2ème = 3 pts | 3ème = 2 pts | 4ème = 1 pt*")
+                st.subheader(f"🏛️ Classement Officiel des Comités Régionaux — {nom_comp_officiel}")
+                st.markdown("*Barème officiel FFLDA : 1er = 4 pts | 2ème = 3 pts | 3ème = 2 pts | 4ème = 1 pt*")
                 st.table(df_comites)
 
             output_bilan = io.BytesIO()
@@ -4141,7 +4397,7 @@ if mode_app.startswith("2"):
                 # Feuille Classement Clubs
                 ws_clubs = writer.sheets["Classement Clubs"]
                 ws_clubs.views.sheetView[0].showGridLines = True
-                ws_clubs.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()}").font = font_titre
+                ws_clubs.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
                 ws_clubs.cell(row=2, column=1, value="🛡️ CLASSEMENT OFFICIEL DES CLUBS - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
                 ws_clubs.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
                 
@@ -4170,7 +4426,7 @@ if mode_app.startswith("2"):
                 # Feuille Classement Comités Régionaux
                 ws_comites = writer.sheets["Classement Comités"]
                 ws_comites.views.sheetView[0].showGridLines = True
-                ws_comites.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()}").font = font_titre
+                ws_comites.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
                 ws_comites.cell(row=2, column=1, value="🏛️ CLASSEMENT OFFICIEL DES COMITÉS RÉGIONAUX - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
                 ws_comites.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
                 
@@ -4197,7 +4453,7 @@ if mode_app.startswith("2"):
                 ws_comites.column_dimensions['G'].width = 12
 
                 ws_indiv.views.sheetView[0].showGridLines = True
-                ws_indiv.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()}").font = font_titre
+                ws_indiv.cell(row=1, column=1, value=f"COMPÉTITION : {nom_comp_officiel.upper()}").font = font_titre
                 ws_indiv.cell(row=2, column=1, value="🏆 CLASSEMENTS INDIVIDUELS OFFICIELS - FFLDA").font = Font(name="Arial", size=12, bold=True, color="666666")
                 ws_indiv.cell(row=3, column=1, value=f"Édité le {datetime.now().strftime('%d/%m/%Y à %H:%M')}").font = Font(name="Arial", size=9, italic=True, color="888888")
                 
@@ -4264,7 +4520,7 @@ if mode_app.startswith("2"):
             pdf_bilan_bytes = None
             try:
                 wb_bilan_excel = openpyxl.load_workbook(io.BytesIO(output_bilan.getvalue()), data_only=True)
-                pdf_bilan_bytes = generer_pdf_depuis_classeur_excel(wb_bilan_excel, nom_competition, wb=wb_bilan_excel)
+                pdf_bilan_bytes = generer_pdf_depuis_classeur_excel(wb_bilan_excel, nom_comp_officiel, wb=wb_bilan_excel)
             except Exception as e_pdf_b:
                 st.warning(f"⚠️ Information : génération PDF du Bilan : {e_pdf_b}")
                 pdf_bilan_bytes = None
@@ -4277,7 +4533,7 @@ if mode_app.startswith("2"):
                     st.download_button(
                         label="📄 Télécharger le Bilan Officiel en PDF (A4 Portrait - Format Excel)",
                         data=pdf_bilan_bytes,
-                        file_name=f"Bilan_Officiel_{nom_competition.replace(' ', '_')}.pdf",
+                        file_name=f"Bilan_Officiel_{nom_comp_officiel.replace(' ', '_')}.pdf",
                         mime="application/pdf",
                         key="btn_pdf_bilan"
                     )
@@ -4287,7 +4543,7 @@ if mode_app.startswith("2"):
                 st.download_button(
                     label="📥 Télécharger le Bilan Officiel Excel (.xlsx)",
                     data=output_bilan.getvalue(),
-                    file_name=f"Bilan_Officiel_{nom_competition.replace(' ', '_')}.xlsx",
+                    file_name=f"Bilan_Officiel_{nom_comp_officiel.replace(' ', '_')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="btn_excel_bilan"
                 )

@@ -2846,7 +2846,10 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
 
         if comparisons:
             somme_comp = " + ".join(comparisons)
-            form_clt = f'=IF(SUM({plage_totaux})=0, "", 1 + {somme_comp})'
+            if len(liste_p) > 2:
+                form_clt = f'=IF(OR(SUM({plage_totaux})=0, {col_pts_lettre}{r}=0), "", 1 + {somme_comp})'
+            else:
+                form_clt = f'=IF(SUM({plage_totaux})=0, "", 1 + {somme_comp})'
         else:
             form_clt = f'=IF(SUM({plage_totaux})=0, "", 1)'
 
@@ -2915,23 +2918,35 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=col_pod+1)
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=col_pod+1)
     
-    form_gold = (
-        f'=IF(SUM({plage_totaux})=0, "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
-        f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
-        f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", ""))'
-    )
-    form_silver = (
-        f'=IF(SUM({plage_totaux})=0, "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
-        f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
-        f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", ""))'
-    )
+    if len(liste_p) > 2:
+        form_gold = (
+            f'=IF(OR(ISNA(MATCH(1, {plage_clt}, 0)), INDEX({plage_totaux}, MATCH(1, {plage_clt}, 0))=0), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
+            f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
+            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", ""))'
+        )
+        form_silver = (
+            f'=IF(OR(ISNA(MATCH(2, {plage_clt}, 0)), INDEX({plage_totaux}, MATCH(2, {plage_clt}, 0))=0), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
+            f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
+            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", ""))'
+        )
+    else:
+        form_gold = (
+            f'=IF(OR(ISNA(MATCH(1, {plage_clt}, 0)), SUM({plage_totaux})=0), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
+            f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
+            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", ""))'
+        )
+        form_silver = (
+            f'=IF(OR(ISNA(MATCH(2, {plage_clt}, 0)), SUM({plage_totaux})=0), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
+            f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
+            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", ""))'
+        )
     
     draw_excel_podium_card(ws, 4, col_pod, "🥇 CHAMPION (OR)", "En attente", fill_gold, font_color="B45309", formula_val=form_gold)
     draw_excel_podium_card(ws, 7, col_pod, "🥈 VICE-CHAMPION (ARGENT)", "En attente", fill_silver, font_color="475569", formula_val=form_silver)
     
     if len(liste_p) >= 3:
         form_bronze = (
-            f'=IF(SUM({plage_totaux})=0, "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente", '
+            f'=IF(OR(ISNA(MATCH(3, {plage_clt}, 0)), INDEX({plage_totaux}, MATCH(3, {plage_clt}, 0))=0), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente", '
             f'"🥉 3ème PLACE (BRONZE)" & CHAR(10) & INDEX({plage_nom}, MATCH(3, {plage_clt}, 0)) & '
             f'IF(INDEX({plage_club}, MATCH(3, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(3, {plage_clt}, 0)) & ")", ""))'
         )

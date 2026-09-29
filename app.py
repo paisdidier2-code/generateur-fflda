@@ -4350,6 +4350,129 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                                 victoires += 1
         return victoires
 
+    def resoudre_classement_deux_poules(ws_target, ws_form, lutteurs_poule):
+        """
+        Résout automatiquement les rangs officiels (1er à 6ème) d'une catégorie à 2 Poules (6 lutteurs)
+        en analysant la Phase Finale Croisée (Demi-Finales 1 & 2, Finale 1-2 et Finale 3-4).
+        """
+        if len(lutteurs_poule) != 6:
+            return
+
+        has_phase2 = False
+        for r in range(1, min(20, ws_target.max_row + 1)):
+            for c in range(1, min(25, ws_target.max_column + 1)):
+                v = str(ws_target.cell(row=r, column=c).value or "").upper()
+                if "DEMI-FINALE" in v or "FINALE 1-2" in v or "PHASE FINALE" in v:
+                    has_phase2 = True
+                    break
+            if has_phase2:
+                break
+
+        if not has_phase2:
+            return
+
+        poule_a = lutteurs_poule[:3]
+        poule_b = lutteurs_poule[3:]
+
+        deuxieme_a, deuxieme_b = None, None
+        premier_a, premier_b = None, None
+
+        for r in range(1, min(25, ws_target.max_row + 1)):
+            for c in range(9, min(20, ws_target.max_column + 1)):
+                val_cell = str(ws_target.cell(row=r, column=c).value or "").upper()
+                if "DEMI-FINALE 1" in val_cell:
+                    for r_sf in [r+1, r+2]:
+                        txt_sf = str(ws_target.cell(row=r_sf, column=c).value or "")
+                        if not txt_sf:
+                            txt_sf = str(ws_target.cell(row=r_sf, column=c+1).value or "")
+                        for p in poule_b:
+                            if comparer_nom_lutteur_podium(p["Nom"], txt_sf):
+                                deuxieme_b = p
+                                break
+                elif "DEMI-FINALE 2" in val_cell:
+                    for r_sf in [r+1, r+2]:
+                        txt_sf = str(ws_target.cell(row=r_sf, column=c).value or "")
+                        if not txt_sf:
+                            txt_sf = str(ws_target.cell(row=r_sf, column=c+1).value or "")
+                        for p in poule_a:
+                            if comparer_nom_lutteur_podium(p["Nom"], txt_sf):
+                                deuxieme_a = p
+                                break
+
+        reste_a = [p for p in poule_a if p != deuxieme_a]
+        if len(reste_a) == 2:
+            v0 = compter_victoires_tableau(ws_target, ws_form, reste_a[0]["Nom"])
+            v1 = compter_victoires_tableau(ws_target, ws_form, reste_a[1]["Nom"])
+            if v0 >= v1:
+                premier_a, troisieme_a = reste_a[0], reste_a[1]
+            else:
+                premier_a, troisieme_a = reste_a[1], reste_a[0]
+        else:
+            troisieme_a = None
+
+        reste_b = [p for p in poule_b if p != deuxieme_b]
+        if len(reste_b) == 2:
+            v0 = compter_victoires_tableau(ws_target, ws_form, reste_b[0]["Nom"])
+            v1 = compter_victoires_tableau(ws_target, ws_form, reste_b[1]["Nom"])
+            if v0 >= v1:
+                premier_b, troisieme_b = reste_b[0], reste_b[1]
+            else:
+                premier_b, troisieme_b = reste_b[1], reste_b[0]
+        else:
+            troisieme_b = None
+
+        gold_winner = None
+        bronze_winner = None
+
+        for r in range(1, min(25, ws_target.max_row + 1)):
+            for c in range(9, min(25, ws_target.max_column + 1)):
+                v_cell = str(ws_target.cell(row=r, column=c).value or "").upper()
+                if "FINALE 1-2" in v_cell:
+                    for r_m in [r+1, r+2]:
+                        score_cell = ws_target.cell(row=r_m, column=c+1).value if ws_target.cell(row=r_m, column=c).value else ws_target.cell(row=r_m, column=c+2).value
+                        score_form = ws_form.cell(row=r_m, column=c+1).value if ws_form else None
+                        score_val = extraire_valeur_numerique_cellule(score_cell, score_form, ws_target)
+                        if score_val > 0:
+                            txt_m = str(ws_target.cell(row=r_m, column=c).value or ws_target.cell(row=r_m, column=c+1).value or "")
+                            if premier_a and ("POULE A" in txt_m.upper() or comparer_nom_lutteur_podium(premier_a["Nom"], txt_m)):
+                                gold_winner = premier_a
+                            elif premier_b and ("POULE B" in txt_m.upper() or comparer_nom_lutteur_podium(premier_b["Nom"], txt_m)):
+                                gold_winner = premier_b
+                elif "FINALE 3-4" in v_cell:
+                    for r_m in [r+1, r+2]:
+                        score_cell = ws_target.cell(row=r_m, column=c+1).value if ws_target.cell(row=r_m, column=c).value else ws_target.cell(row=r_m, column=c+2).value
+                        score_form = ws_form.cell(row=r_m, column=c+1).value if ws_form else None
+                        score_val = extraire_valeur_numerique_cellule(score_cell, score_form, ws_target)
+                        if score_val > 0:
+                            txt_m = str(ws_target.cell(row=r_m, column=c).value or ws_target.cell(row=r_m, column=c+1).value or "")
+                            if deuxieme_a and comparer_nom_lutteur_podium(deuxieme_a["Nom"], txt_m):
+                                bronze_winner = deuxieme_a
+                            elif deuxieme_b and comparer_nom_lutteur_podium(deuxieme_b["Nom"], txt_m):
+                                bronze_winner = deuxieme_b
+
+        if gold_winner == premier_a:
+            if premier_a: premier_a["Clt_Excel"] = 1
+            if premier_b: premier_b["Clt_Excel"] = 2
+        elif gold_winner == premier_b:
+            if premier_b: premier_b["Clt_Excel"] = 1
+            if premier_a: premier_a["Clt_Excel"] = 2
+        else:
+            if premier_a: premier_a["Clt_Excel"] = 1
+            if premier_b: premier_b["Clt_Excel"] = 2
+
+        if bronze_winner == deuxieme_a:
+            if deuxieme_a: deuxieme_a["Clt_Excel"] = 3
+            if deuxieme_b: deuxieme_b["Clt_Excel"] = 4
+        elif bronze_winner == deuxieme_b:
+            if deuxieme_b: deuxieme_b["Clt_Excel"] = 3
+            if deuxieme_a: deuxieme_a["Clt_Excel"] = 4
+        else:
+            if deuxieme_a: deuxieme_a["Clt_Excel"] = 3
+            if deuxieme_b: deuxieme_b["Clt_Excel"] = 4
+
+        if troisieme_a: troisieme_a["Clt_Excel"] = 5
+        if troisieme_b: troisieme_b["Clt_Excel"] = 6
+
     def determiner_points_lutteur(ws_target, ws_form, r_row, col_tot, col_start_t=5, h_row=4, nom_lutteur=""):
         if nom_lutteur:
             vics_tab = compter_victoires_tableau(ws_target, ws_form, nom_lutteur)
@@ -4547,6 +4670,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
             r += 1
 
         if lutteurs_poule:
+            resoudre_classement_deux_poules(ws, ws_f, lutteurs_poule)
             sorted_p = sorted(
                 lutteurs_poule, 
                 key=lambda x: (

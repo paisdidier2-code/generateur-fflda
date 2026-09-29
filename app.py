@@ -4331,7 +4331,31 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
 
         return 0.0
 
-    def determiner_points_lutteur(ws_target, ws_form, r_row, col_tot, col_start_t=5, h_row=4):
+    def compter_victoires_tableau(ws_target, ws_form, nom_lutteur):
+        """Compte le nombre de matchs remportés par un lutteur dans la grille de tableau à élimination directe."""
+        if not nom_lutteur:
+            return 0
+        victoires = 0
+        for r_v in range(1, ws_target.max_row + 1):
+            for c_v in range(1, ws_target.max_column + 1):
+                val_cell = str(ws_target.cell(row=r_v, column=c_v).value or "")
+                if val_cell and (val_cell.startswith("🔴") or val_cell.startswith("🔵")):
+                    if comparer_nom_lutteur_podium(nom_lutteur, val_cell):
+                        c_score = c_v + 1
+                        if c_score <= ws_target.max_column:
+                            v_s_d = ws_target.cell(row=r_v, column=c_score).value
+                            v_s_f = ws_form.cell(row=r_v, column=c_score).value if ws_form else None
+                            pts_m = extraire_valeur_numerique_cellule(v_s_d, v_s_f, ws_target)
+                            if pts_m > 0:
+                                victoires += 1
+        return victoires
+
+    def determiner_points_lutteur(ws_target, ws_form, r_row, col_tot, col_start_t=5, h_row=4, nom_lutteur=""):
+        if nom_lutteur:
+            vics_tab = compter_victoires_tableau(ws_target, ws_form, nom_lutteur)
+            if vics_tab > 0:
+                return vics_tab
+
         pts = 0.0
         if col_tot:
             val_d = ws_target.cell(row=r_row, column=col_tot).value
@@ -4484,7 +4508,7 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
                     poids_val = formater_poids_local(poids_raw)
                     
-                    pts_val = determiner_points_lutteur(ws, ws_f, r, col_total_pts, col_start_t=5, h_row=h_row)
+                    pts_val = determiner_points_lutteur(ws, ws_f, r, col_total_pts, col_start_t=5, h_row=h_row, nom_lutteur=nom)
                     
                     clt_raw = ws.cell(row=r, column=col_clt).value if col_clt else None
                     clt_cleaned = nettoyer_rang(clt_raw)

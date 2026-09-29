@@ -1398,6 +1398,16 @@ def generer_document_bracket_imprimable(nom_poule, nom_comp, bracket_html):
 def generer_document_poule_imprimable(nom_poule, nom_comp, participants, rondes):
     nb_tours = len(rondes) if rondes else 0
     
+    lutteurs_par_tour = []
+    for ronde in (rondes or []):
+        combatants = set()
+        for match in ronde:
+            p1_nom = match[0].get('Nom', '') if isinstance(match[0], dict) else str(match[0])
+            p2_nom = match[1].get('Nom', '') if isinstance(match[1], dict) else str(match[1])
+            combatants.add(p1_nom)
+            combatants.add(p2_nom)
+        lutteurs_par_tour.append(combatants)
+
     lignes_html = []
     for idx, p in enumerate(participants, 1):
         bg = "#F8FAFC" if idx % 2 == 0 else "#FFFFFF"
@@ -1406,7 +1416,13 @@ def generer_document_poule_imprimable(nom_poule, nom_comp, participants, rondes)
         comite = p.get('Comité', '')
         poids = formater_poids(p.get('Poids', ''))
         
-        tours_tds = ''.join(['<td style="border: 1px solid #CBD5E1; padding: 6px; text-align: center;"></td>' for _ in range(nb_tours)])
+        tours_tds_list = []
+        for t_idx in range(nb_tours):
+            if t_idx < len(lutteurs_par_tour) and nom in lutteurs_par_tour[t_idx]:
+                tours_tds_list.append('<td style="border: 1px solid #CBD5E1; padding: 6px; text-align: center; background: #E2E8F0;"></td>')
+            else:
+                tours_tds_list.append('<td style="border: 1px solid #CBD5E1; padding: 6px; text-align: center;"></td>')
+        tours_tds = ''.join(tours_tds_list)
         
         lignes_html.append(f"""
         <tr style="background: {bg};">
@@ -2460,6 +2476,7 @@ def construire_feuille_poules_croisees_excel(ws, p_obj, nom_poule, liste_p, coor
     fill_gold = PatternFill("solid", fgColor="FEF3C7")
     fill_silver = PatternFill("solid", fgColor="F1F5F9")
     fill_bronze = PatternFill("solid", fgColor="FFEDD5")
+    fill_active_match = PatternFill("solid", fgColor="E2E8F0")
     
     b_thin = Side(style='thin', color='CBD5E1')
     b_style = Border(left=b_thin, right=b_thin, top=b_thin, bottom=b_thin)
@@ -2526,6 +2543,8 @@ def construire_feuille_poules_croisees_excel(ws, p_obj, nom_poule, liste_p, coor
             for t_i in range(3):
                 c_t = ws.cell(row=row_cur, column=5+t_i)
                 c_t.alignment, c_t.border = Alignment(horizontal="center", vertical="center"), b_style
+                if (t_i == 0 and idx in (1, 2)) or (t_i == 1 and idx in (2, 3)) or (t_i == 2 and idx in (1, 3)):
+                    c_t.fill = fill_active_match
             
             c_tot = ws.cell(row=row_cur, column=8, value=f"=SUM(E{row_cur}:G{row_cur})")
             c_tot.font, c_tot.alignment, c_tot.border = font_pts, Alignment(horizontal="center", vertical="center"), b_style
@@ -2817,13 +2836,20 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
 
     # Correspondance des combats directs entre lutteurs pour le départage FFLDA
     match_col_map = {}
-    for tour_idx, ronde in enumerate(rondes, 1):
+    lutteurs_par_tour = []
+    for tour_idx, ronde in enumerate(rondes or [], 1):
         col_t_lettre = get_column_letter(5 + tour_idx)
+        combatants = set()
         for match in ronde:
             p1_nom = match[0].get('Nom', '') if isinstance(match[0], dict) else str(match[0])
             p2_nom = match[1].get('Nom', '') if isinstance(match[1], dict) else str(match[1])
             match_col_map[(p1_nom, p2_nom)] = col_t_lettre
             match_col_map[(p2_nom, p1_nom)] = col_t_lettre
+            combatants.add(p1_nom)
+            combatants.add(p2_nom)
+        lutteurs_par_tour.append(combatants)
+
+    fill_active_match = PatternFill("solid", fgColor="E2E8F0")
 
     for idx, p in enumerate(liste_p, 1):
         r = ligne_debut_poule + idx - 1
@@ -2879,10 +2905,6 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
         c_comite = ws.cell(row=r, column=5, value=p.get('Comité', ''))
         c_comite.border = b_style
         
-        for t in range(nb_tours):
-            c_tour = ws.cell(row=r, column=6 + t)
-            c_tour.alignment, c_tour.border = Alignment(horizontal="center", vertical="center"), b_style
-            
         if nb_tours > 0:
             c_tot_pts = ws.cell(row=r, column=col_pts_idx, value=f"=SUM({col_debut_tours_lettre}{r}:{col_fin_tours_lettre}{r})")
             c_tot_vict = ws.cell(row=r, column=col_vict_idx, value=f"=COUNTIF({col_debut_tours_lettre}{r}:{col_fin_tours_lettre}{r}, 2)")
@@ -2899,6 +2921,12 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
         if idx % 2 == 0:
             for col_k in range(1, col_fin_table + 1):
                 ws.cell(row=r, column=col_k).fill = fill_zebra
+
+        for t in range(nb_tours):
+            c_tour = ws.cell(row=r, column=6 + t)
+            c_tour.alignment, c_tour.border = Alignment(horizontal="center", vertical="center"), b_style
+            if t < len(lutteurs_par_tour) and p['Nom'] in lutteurs_par_tour[t]:
+                c_tour.fill = fill_active_match
 
     # Ajustement dynamique des largeurs de colonnes
     max_len_nom = max([len(str(p.get('Nom', ''))) for p in liste_p] + [12])
@@ -4630,6 +4658,12 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
                     
                     poids_raw = ws.cell(row=r, column=col_poids).value if col_poids else 0
                     poids_val = formater_poids_local(poids_raw)
+                    if not poids_val or str(poids_val).strip() in ["0", "0 kg", "0kg", "-", "None", "nan"]:
+                        m_p = re.search(r'(\+?\d+(?:[\.,]\d+)?\s*kg)', nom_feuille, re.IGNORECASE)
+                        if m_p:
+                            poids_val = m_p.group(1).strip()
+                            if not poids_val.lower().endswith("kg"):
+                                poids_val += " kg"
                     
                     pts_val = determiner_points_lutteur(ws, ws_f, r, col_total_pts, col_start_t=5, h_row=h_row, nom_lutteur=nom)
                     
@@ -4987,7 +5021,18 @@ if mode_app.startswith("2"):
                     sous_df = df_bilan_edited[df_bilan_edited['Poule'] == poule][['Clt', 'Nom', 'Club', 'Poids', 'Points']].copy()
                     sous_df['Points'] = sous_df['Points'].astype(int)
                     sous_df = sous_df.reset_index(drop=True)
-                    st.dataframe(sous_df, use_container_width=True, hide_index=True)
+                    st.dataframe(
+                        sous_df,
+                        column_config={
+                            "Clt": st.column_config.TextColumn("Clt / Rang"),
+                            "Nom": st.column_config.TextColumn("Nom Prénom"),
+                            "Club": st.column_config.TextColumn("Club"),
+                            "Poids": st.column_config.TextColumn("Poids"),
+                            "Points": st.column_config.NumberColumn("Points Victoire", format="%d")
+                        },
+                        use_container_width=True,
+                        hide_index=True
+                    )
 
             with tab_bilan_2:
                 st.subheader(f"🛡️ Podium des Clubs Engagés — {nom_comp_officiel}")

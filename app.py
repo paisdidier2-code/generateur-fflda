@@ -9,6 +9,7 @@ import streamlit.components.v1 as components
 import openpyxl
 from openpyxl.styles import Alignment, PatternFill, Font, Border, Side
 from openpyxl.worksheet.pagebreak import Break
+from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.utils import get_column_letter
 
 # --- CONFIGURATION DE LA PAGE ---
@@ -6478,6 +6479,11 @@ else:
                     ws_mat.page_setup.fitToWidth = 1
                     ws_mat.page_setup.fitToHeight = 0
                     
+                    dv_u9_u11 = DataValidation(type="list", formula1='"0,1,2"', allow_blank=True)
+                    dv_u13 = DataValidation(type="list", formula1='"0,1,3,4,5"', allow_blank=True)
+                    ws_mat.add_data_validation(dv_u9_u11)
+                    ws_mat.add_data_validation(dv_u13)
+                    
                     ws_mat.row_dimensions[1].height = 35
                     ws_mat.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
                     titre_mat = ws_mat.cell(row=1, column=1, value=f"🏆 {nom_competition.upper()} - GRILLE DE PASSAGE : TAPIS {t + 1} 🏆")
@@ -6488,7 +6494,7 @@ else:
                     noms_arb = ", ".join([a['Nom_Complet'] for a in tapis_arbitres[t]]) if (liste_arbitres and tapis_arbitres[t]) else "Aucun arbitre affecté"
                     ws_mat.row_dimensions[2].height = 22
                     ws_mat.merge_cells(start_row=2, start_column=1, end_row=2, end_column=9)
-                    sub_mat = ws_mat.cell(row=2, column=1, value=f"🛡️ Arbitrage : {noms_arb}  |  * Annotations des scores sous chaque match (Pt Clt, Actions, Total Score)")
+                    sub_mat = ws_mat.cell(row=2, column=1, value=f"🛡️ Arbitrage : {noms_arb}  |  * Menus déroulants Pt Clt (U9/U11 : 0, 1, 2 | U13 : 0, 1, 3, 4, 5)")
                     sub_mat.font = Font(name="Arial", size=10, italic=True, bold=True, color="0055A4")
                     sub_mat.alignment = Alignment(horizontal="center", vertical="center")
 
@@ -6609,6 +6615,14 @@ else:
                             box_ptb = ws_mat.cell(row=r_curr, column=9)
                             box_ptb.border, box_ptb.fill = b_style, gris_clair
                             box_ptb.alignment = Alignment(horizontal="center", vertical="center")
+                            
+                            # Menus déroulants sous Pt Clt selon la catégorie d'âge (U9/U11 : 0,1,2 | U13 : 0,1,3,4,5)
+                            if age_m in ['U9', 'U11']:
+                                dv_u9_u11.add(box_ptr.coordinate)
+                                dv_u9_u11.add(box_ptb.coordinate)
+                            elif age_m == 'U13':
+                                dv_u13.add(box_ptr.coordinate)
+                                dv_u13.add(box_ptb.coordinate)
                             
                             def reg_tapis_slot(k, sl):
                                 if k not in tapis_slots_map:

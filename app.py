@@ -4746,25 +4746,7 @@ if mode_app.startswith("2"):
             except Exception:
                 pass
             
-            # Option d'édition interactive et aperçu direct
-            st.markdown("---")
-            with st.expander("✏️ Vérification & Ajustement des Résultats (Aperçu Interactif)", expanded=True):
-                st.info("💡 Vous pouvez modifier directement le rang (`Clt`), le `Nom`, le `Club`, ou les `Points` ci-dessous si besoin. Le classement général des clubs et comités régionaux sera immédiatement recalculé !")
-                df_bilan_edited = st.data_editor(
-                    df_bilan,
-                    column_config={
-                        "Clt": st.column_config.TextColumn("Clt / Rang", help="Rang officiel (1, 2, 3, 4, 5...)"),
-                        "Nom": st.column_config.TextColumn("Nom Prénom"),
-                        "Club": st.column_config.TextColumn("Club"),
-                        "Comité": st.column_config.TextColumn("Comité Régional"),
-                        "Poids": st.column_config.TextColumn("Poids"),
-                        "Points": st.column_config.NumberColumn("Points Victoire", step=1),
-                        "Poule": st.column_config.TextColumn("Poule / Catégorie"),
-                    },
-                    use_container_width=True,
-                    hide_index=True,
-                    key="editor_bilan_mode2"
-                )
+            df_bilan_edited = df_bilan
 
             # --- CALCUL DU CLASSEMENT DES CLUBS ET DES COMITÉS RÉGIONAUX ---
             bareme_points = {1: 4, 2: 3, 3: 2, 4: 1}

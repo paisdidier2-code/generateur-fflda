@@ -711,11 +711,11 @@ def generer_competition_u13(age, style_grp, suffixe_niveau, cat_poids, participa
             )
             f_b1 = (
                 {"Nom": f"Vainqueur Repêchage 1 [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             f_b2 = (
                 {"Nom": f"Perdant 1/4 (3) [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             rondes.append([f_or, f_b1, f_b2])
 
@@ -802,11 +802,11 @@ def generer_competition_u13(age, style_grp, suffixe_niveau, cat_poids, participa
             )
             f_b1 = (
                 {"Nom": f"Vainqueur Repêchage 1 [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             f_b2 = (
                 {"Nom": f"Vainqueur Repêchage 2 [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             rondes.append([f_or, f_b1, f_b2])
 
@@ -905,11 +905,11 @@ def generer_competition_u13(age, style_grp, suffixe_niveau, cat_poids, participa
             )
             f_b1 = (
                 {"Nom": f"Vainqueur Repêchage 1 [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             f_b2 = (
                 {"Nom": f"Vainqueur Repêchage 2 [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             rondes.append([f_or, f_b1, f_b2])
 
@@ -1021,11 +1021,11 @@ def generer_competition_u13(age, style_grp, suffixe_niveau, cat_poids, participa
             )
             f_b1 = (
                 {"Nom": f"Vainqueur Repêchage 1 [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             f_b2 = (
                 {"Nom": f"Vainqueur Repêchage 2 [{cat_poids}]", "Club": "Repêché", "Comité": "-"},
-                {"Nom": f"Perdant 1/2 (1) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
+                {"Nom": f"Perdant 1/2 (2) [{cat_poids}]", "Club": "Qualifié", "Comité": "-"}
             )
             rondes.append([f_or, f_b1, f_b2])
 
@@ -1287,7 +1287,7 @@ def generer_arbre_tableau_html(p_obj):
                 <span style="background: #0284C7; color: white; padding: 5px 14px; border-radius: 16px; font-size: 12px; font-weight: 800; text-transform: uppercase;">
                     🔄 Repêchages & Attribution du Bronze (2 Troisièmes Places)
                 </span>
-                <span style="font-size: 11px; color: #64748B; font-weight: 600;">Perdants des 1/4 ➔ Repêchages ➔ Finales Bronze contre Perdants des 1/2</span>
+                <span style="font-size: 11px; color: #64748B; font-weight: 600;">Perdants des 1/4 ➔ Repêchages ➔ Finales Bronze contre Perdants des 1/2 de leur propre demi-tableau</span>
             </div>
 
             <div style="overflow-x: auto; padding-bottom: 10px;">
@@ -2372,9 +2372,9 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
         ws.cell(row=row_rep+4, column=conn_col_qf_sf).border = Border(bottom=Side(style='medium', color='94A3B8'))
         ws.cell(row=row_rep+9, column=conn_col_qf_sf).border = Border(bottom=Side(style='medium', color='94A3B8'))
 
-        # Finale Bronze 1 (Vainqueur Repêchage 1 vs Perdant Demi-Finale 2)
+        # Finale Bronze 1 (Vainqueur Repêchage 1 vs Perdant Demi-Finale 1)
         fb1_p1 = {'Nom': f_b1[0]['Nom'], 'formula': make_winner_formula(rep1_r, rep1_b, rep1_ptr, rep1_ptb, "Vainqueur Repêchage 1", "🔴")}
-        fb1_p2 = {'Nom': f_b1[1]['Nom'], 'formula': make_loser_formula(sf2_r, sf2_b, sf2_ptr, sf2_ptb, "Perdant 1/2 (2)", "🔵")}
+        fb1_p2 = {'Nom': f_b1[1]['Nom'], 'formula': make_loser_formula(sf1_r, sf1_b, sf1_ptr, sf1_ptb, "Perdant 1/2 (1)", "🔵")}
         b1_ptr, b1_ptb, b1_r, b1_b = draw_excel_match_card(ws, row_rep+3, col_sf, "FINALE BRONZE 1", fb1_p1, fb1_p2, nom_poule, coords_matchs_tapis, bg_header=fill_amber)
 
         r_b1 = f"IF({b1_ptr.coordinate}=\"\",0,{b1_ptr.coordinate})"
@@ -2382,12 +2382,12 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
         form_b1 = f'=IFERROR(IF({r_b1}+{b_b1}=0, "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & "En attente", "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & SUBSTITUTE(SUBSTITUTE(IF({r_b1}>{b_b1}, {b1_r.coordinate}, IF({b_b1}>{r_b1}, {b1_b.coordinate}, "En attente")), "🔴 ", ""), "🔵 ", "")), "🥉 3ème PLACE (Bronze 1)" & CHAR(10) & "En attente")'
         draw_excel_podium_card(ws, row_rep+3, col_pod, "🥉 3ème PLACE (Bronze 1)", "Vainqueur Finale Bronze 1", fill_bronze, font_color="9A3412", formula_val=form_b1)
 
-        # Finale Bronze 2 (Vainqueur Repêchage 2 ou Perdant QF 3 vs Perdant Demi-Finale 1)
+        # Finale Bronze 2 (Vainqueur Repêchage 2 ou Perdant QF 3 vs Perdant Demi-Finale 2)
         if n == 7:
             fb2_p1 = {'Nom': f_b2[0]['Nom'], 'formula': make_loser_formula(qf3_r, qf3_b, qf3_ptr, qf3_ptb, "Perdant 1/4 (3)", "🔴")}
         else:
             fb2_p1 = {'Nom': f_b2[0]['Nom'], 'formula': make_winner_formula(rep2_r, rep2_b, rep2_ptr, rep2_ptb, "Vainqueur Repêchage 2", "🔴")}
-        fb2_p2 = {'Nom': f_b2[1]['Nom'], 'formula': make_loser_formula(sf1_r, sf1_b, sf1_ptr, sf1_ptb, "Perdant 1/2 (1)", "🔵")}
+        fb2_p2 = {'Nom': f_b2[1]['Nom'], 'formula': make_loser_formula(sf2_r, sf2_b, sf2_ptr, sf2_ptb, "Perdant 1/2 (2)", "🔵")}
         b2_ptr, b2_ptb, b2_r, b2_b = draw_excel_match_card(ws, row_rep+8, col_sf, "FINALE BRONZE 2", fb2_p1, fb2_p2, nom_poule, coords_matchs_tapis, bg_header=fill_amber)
 
         r_b2 = f"IF({b2_ptr.coordinate}=\"\",0,{b2_ptr.coordinate})"

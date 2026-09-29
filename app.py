@@ -1889,7 +1889,7 @@ def link_tapis_slot(tapis_slots, cat, p_nom, ws_bracket, bracket_cell):
 
 
 
-def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=None):
+def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=None, tapis_num=None):
     font_title = Font(name="Arial", size=13, bold=True, color="0055A4")
     font_sub = Font(name="Arial", size=9, italic=True, color="64748B")
     font_hdr = Font(name="Arial", size=10, bold=True, color="FFFFFF")
@@ -1911,6 +1911,10 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
     
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — TABLEAU OFFICIEL U13 : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Élimination directe avec repêchage des 1/4 de finale (2 Médailles de Bronze) — Orientation : Gauche ➔ Droite").font = font_sub
+    if tapis_num:
+        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
+        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret.font = Font(name="Arial", size=9, bold=True, color="0055A4", underline="single")
 
     # Table des participants inscrits (Cols A-D)
     ws.cell(row=4, column=1, value="LISTE DES PARTICIPANTS").font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
@@ -2462,7 +2466,7 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
     ws.page_setup.fitToHeight = 0
 
 
-def construire_feuille_poules_croisees_excel(ws, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=None):
+def construire_feuille_poules_croisees_excel(ws, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=None, tapis_num=None):
     font_title = Font(name="Arial", size=13, bold=True, color="0055A4")
     font_sub = Font(name="Arial", size=9, italic=True, color="64748B")
     font_hdr = Font(name="Arial", size=10, bold=True, color="FFFFFF")
@@ -2486,6 +2490,10 @@ def construire_feuille_poules_croisees_excel(ws, p_obj, nom_poule, liste_p, coor
     
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — POULES CROISÉES U13 (6 LUTTEURS) : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Phase 1 (2 Poules de 3 Nordiques) ➔ Phase 2 (Demi-Finales Croisées & Finales Or/Argent et Bronze unique)").font = font_sub
+    if tapis_num:
+        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
+        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret.font = Font(name="Arial", size=9, bold=True, color="0055A4", underline="single")
 
     poule_a = p_obj.get('poule_a', liste_p[:3])
     poule_b = p_obj.get('poule_b', liste_p[3:])
@@ -2688,7 +2696,7 @@ def construire_feuille_poules_croisees_excel(ws, p_obj, nom_poule, liste_p, coor
     ws.page_setup.fitToHeight = 0
 
 
-def construire_feuille_plateau_u7_excel(ws, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition):
+def construire_feuille_plateau_u7_excel(ws, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_num=None):
     font_title = Font(name="Arial", size=13, bold=True, color="B45309")
     font_sub = Font(name="Arial", size=9, italic=True, color="64748B")
     font_hdr = Font(name="Arial", size=10, bold=True, color="FFFFFF")
@@ -2705,6 +2713,10 @@ def construire_feuille_plateau_u7_excel(ws, p_obj, nom_poule, liste_p, coords_ma
     
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — ANIMATION PLATEAU U7 : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Découverte pédagogique sous forme de 3 plateaux d'activités avec rotation (Tous les enfants sont récompensés)").font = font_sub
+    if tapis_num:
+        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
+        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret.font = Font(name="Arial", size=9, bold=True, color="B45309", underline="single")
     
     headers = [
         "N°", "NOM Prénom", "CLUB", "POIDS", 
@@ -2785,7 +2797,7 @@ def construire_feuille_plateau_u7_excel(ws, p_obj, nom_poule, liste_p, coords_ma
     ws.page_setup.fitToHeight = 0
 
 
-def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coords_matchs_tapis, nom_competition):
+def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coords_matchs_tapis, nom_competition, tapis_num=None):
     font_title = Font(name="Arial", size=13, bold=True, color="0055A4")
     font_sub = Font(name="Arial", size=9, italic=True, color="64748B")
     font_hdr = Font(name="Arial", size=10, bold=True, color="FFFFFF")
@@ -2806,6 +2818,10 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
     # Titre officiel FFLDA & sous-titre
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — POULE OFFICIELLE : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Tournoi nordique (Tous contre tous) — Point de classement : 2 pt = victoire, 1 pt = nul, 0 pt = défaite").font = font_sub
+    if tapis_num:
+        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
+        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret.font = Font(name="Arial", size=9, bold=True, color="0055A4", underline="single")
 
     nb_tours = len(rondes) if rondes else 0
     headers = ["CLT", "N°", "NOM Prénom", "CLUB", "COMITÉ"]
@@ -6416,6 +6432,30 @@ else:
             coords_matchs_tapis = {}
             tapis_slots_map = {}
             poule_sheet_names = {}
+            poule_tapis_map = {}
+
+            for t_idx in range(nb_tapis):
+                for it_m in planning_tapis[t_idx]:
+                    if it_m.get("Type") == "MATCH" and it_m.get("Cat"):
+                        c_k = it_m["Cat"]
+                        if c_k not in poule_tapis_map:
+                            poule_tapis_map[c_k] = t_idx + 1
+
+            feuilles_reservees = {"résumé", "grille de passage", "corps d'arbitrage"} | {f"grille tapis {t + 1}" for t in range(nb_tapis)}
+            for nom_poule in participants_par_poule.keys():
+                nom_base = abreger_nom_onglet(nom_poule)
+                nom_onglet_court = nom_base
+                suffix_i = 1
+                while nom_onglet_court.lower() in feuilles_reservees:
+                    nom_onglet_court = f"{nom_base[:28]}_{suffix_i}"
+                    suffix_i += 1
+                feuilles_reservees.add(nom_onglet_court.lower())
+                poule_sheet_names[nom_poule] = nom_onglet_court
+                if nom_poule not in poule_tapis_map:
+                    for c_k, t_num in list(poule_tapis_map.items()):
+                        if c_k in nom_poule or nom_poule in c_k:
+                            poule_tapis_map[nom_poule] = t_num
+                            break
 
             with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
                 writer.book.calculation.fullCalcOnLoad = True
@@ -6535,11 +6575,25 @@ else:
                             arb_txt = f"  |  🛡️ Arbitre : {item['Arbitre']}" if item.get('Arbitre') and item['Arbitre'] != "Non attribué" else ""
                             tour_label = nettoyer_nom_tour(item.get('Nom_Tour') or item.get('Tour'))
                             tour_txt = f"  |  🎯 Tour : {tour_label}" if tour_label else ""
-                            hdr_text = f"MATCH N° {m_count_t}  |  🕘 {item['Heure']} ({item['Duree']} min)  |  Catégorie : {item['Cat']}{tour_txt}{arb_txt}"
+                            cat_item = item.get('Cat', '')
+                            sheet_cible = poule_sheet_names.get(cat_item)
+                            if not sheet_cible:
+                                for p_nom, s_name in poule_sheet_names.items():
+                                    if cat_item == p_nom or cat_item in p_nom or p_nom in cat_item:
+                                        sheet_cible = s_name
+                                        break
+                            
+                            lien_suffix = "  |  🔗 Voir Poule" if sheet_cible else ""
+                            hdr_text = f"MATCH N° {m_count_t}  |  🕘 {item['Heure']} ({item['Duree']} min)  |  Catégorie : {cat_item}{tour_txt}{arb_txt}{lien_suffix}"
                             h_cell = ws_mat.cell(row=r_curr, column=1, value=hdr_text)
-                            age_m = extraire_age_de_texte(item.get('Cat', ''))
+                            age_m = extraire_age_de_texte(cat_item)
                             cfg_m = COULEURS_AGE_GRILLE.get(age_m, COULEURS_AGE_GRILLE['AUTRE'])
-                            h_cell.fill, h_cell.font, h_cell.alignment = cfg_m['bg_excel_header'], Font(name="Arial", bold=True, color="FFFFFF", size=11), Alignment(horizontal="center", vertical="center")
+                            h_cell.fill, h_cell.alignment = cfg_m['bg_excel_header'], Alignment(horizontal="center", vertical="center")
+                            if sheet_cible:
+                                h_cell.hyperlink = f"#'{sheet_cible}'!A1"
+                                h_cell.font = Font(name="Arial", bold=True, color="FFFFFF", size=11, underline="single")
+                            else:
+                                h_cell.font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
                             ws_mat.row_dimensions[r_curr].height = 24
                             r_curr += 1
 
@@ -6811,25 +6865,28 @@ else:
 
                 feuilles_creees = set()
                 for nom_poule, liste_p in participants_par_poule.items():
-                    nom_base = abreger_nom_onglet(nom_poule)
-                    nom_onglet_court = nom_base
-                    suffix_i = 1
-                    while nom_onglet_court.lower() in feuilles_creees or nom_onglet_court in writer.book.sheetnames:
-                        nom_onglet_court = f"{nom_base[:28]}_{suffix_i}"
-                        suffix_i += 1
+                    nom_onglet_court = poule_sheet_names.get(nom_poule)
+                    if not nom_onglet_court or nom_onglet_court in writer.book.sheetnames:
+                        nom_base = abreger_nom_onglet(nom_poule)
+                        nom_onglet_court = nom_base
+                        suffix_i = 1
+                        while nom_onglet_court.lower() in feuilles_creees or nom_onglet_court in writer.book.sheetnames:
+                            nom_onglet_court = f"{nom_base[:28]}_{suffix_i}"
+                            suffix_i += 1
                     feuilles_creees.add(nom_onglet_court.lower())
                     poule_sheet_names[nom_poule] = nom_onglet_court
                     ws_poule = writer.book.create_sheet(nom_onglet_court)
                     
+                    t_num_poule = poule_tapis_map.get(nom_poule, 1)
                     p_obj = poule_obj_map.get(nom_poule)
                     if p_obj and p_obj.get('type_formule') == 'tableau':
-                        construire_feuille_tableau_excel(ws_poule, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=tapis_slots_map)
+                        construire_feuille_tableau_excel(ws_poule, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=tapis_slots_map, tapis_num=t_num_poule)
                     elif p_obj and p_obj.get('type_formule') == 'poules_croisees':
-                        construire_feuille_poules_croisees_excel(ws_poule, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=tapis_slots_map)
+                        construire_feuille_poules_croisees_excel(ws_poule, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_slots=tapis_slots_map, tapis_num=t_num_poule)
                     elif p_obj and p_obj.get('type_formule') == 'plateau_u7':
-                        construire_feuille_plateau_u7_excel(ws_poule, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition)
+                        construire_feuille_plateau_u7_excel(ws_poule, p_obj, nom_poule, liste_p, coords_matchs_tapis, nom_competition, tapis_num=t_num_poule)
                     else:
-                        construire_feuille_poule_nordique_excel(ws_poule, nom_poule, liste_p, rondes_par_categorie.get(nom_poule, []), coords_matchs_tapis, nom_competition)
+                        construire_feuille_poule_nordique_excel(ws_poule, nom_poule, liste_p, rondes_par_categorie.get(nom_poule, []), coords_matchs_tapis, nom_competition, tapis_num=t_num_poule)
 
             excel_bytes_tournoi_complet = output_excel.getvalue()
 

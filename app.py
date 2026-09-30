@@ -2070,8 +2070,7 @@ def construire_feuille_tableau_excel(ws, p_obj, nom_poule, liste_p, coords_match
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — TABLEAU OFFICIEL U13 : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Élimination directe avec repêchage des 1/4 de finale (2 Médailles de Bronze) — Orientation : Gauche ➔ Droite").font = font_sub
     if tapis_num:
-        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
-        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret = ws.cell(row=3, column=1, value=f'=HYPERLINK("#\'Grille Tapis {tapis_num}\'!A1", "⬅️ Revenir à la Grille Tapis {tapis_num}")')
         c_ret.font = Font(name="Arial", size=9, bold=True, color="0055A4", underline="single")
 
     # Table des participants inscrits (Cols A-D)
@@ -2649,8 +2648,7 @@ def construire_feuille_poules_croisees_excel(ws, p_obj, nom_poule, liste_p, coor
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — POULES CROISÉES U13 (6 LUTTEURS) : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Phase 1 (2 Poules de 3 Nordiques) ➔ Phase 2 (Demi-Finales Croisées & Finales Or/Argent et Bronze unique)").font = font_sub
     if tapis_num:
-        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
-        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret = ws.cell(row=3, column=1, value=f'=HYPERLINK("#\'Grille Tapis {tapis_num}\'!A1", "⬅️ Revenir à la Grille Tapis {tapis_num}")')
         c_ret.font = Font(name="Arial", size=9, bold=True, color="0055A4", underline="single")
 
     poule_a = p_obj.get('poule_a', liste_p[:3])
@@ -2872,8 +2870,7 @@ def construire_feuille_plateau_u7_excel(ws, p_obj, nom_poule, liste_p, coords_ma
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — ANIMATION PLATEAU U7 : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Découverte pédagogique sous forme de 3 plateaux d'activités avec rotation (Tous les enfants sont récompensés)").font = font_sub
     if tapis_num:
-        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
-        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret = ws.cell(row=3, column=1, value=f'=HYPERLINK("#\'Grille Tapis {tapis_num}\'!A1", "⬅️ Revenir à la Grille Tapis {tapis_num}")')
         c_ret.font = Font(name="Arial", size=9, bold=True, color="B45309", underline="single")
     
     headers = [
@@ -2977,18 +2974,14 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — POULE OFFICIELLE : {nom_poule}").font = font_title
     ws.cell(row=2, column=1, value="Formule officielle FFLDA : Tournoi nordique (Tous contre tous) — Départage : Victoires ➔ Rencontre directe (si 2) ➔ Pt Clt ➔ VT ➔ VST ➔ Pts marqués ➔ Pts concédés ➔ N° Tirage").font = font_sub
     if tapis_num:
-        c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
-        c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
+        c_ret = ws.cell(row=3, column=1, value=f'=HYPERLINK("#\'Grille Tapis {tapis_num}\'!A1", "⬅️ Revenir à la Grille Tapis {tapis_num}")')
         c_ret.font = Font(name="Arial", size=9, bold=True, color="0055A4", underline="single")
 
     is_u13_nordique = "u13" in nom_poule.lower()
     seuil_vict = 3 if is_u13_nordique else 2
 
     dv_nordic_type = DataValidation(type="list", formula1='"VT,VST,DT,DST"', allow_blank=True)
-    ws.add_data_validation(dv_nordic_type)
-    
     dv_nordic_pts = DataValidation(type="list", formula1='"0,1,3,4,5"' if is_u13_nordique else '"0,1,2"', allow_blank=True)
-    ws.add_data_validation(dv_nordic_pts)
 
     nb_tours = len(rondes) if rondes else 0
     headers = ["CLT", "N°", "NOM Prénom", "CLUB", "COMITÉ"]
@@ -3136,10 +3129,10 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
                 with_details=True
             )
             
-            dv_nordic_pts.add(c_pt_r)
-            dv_nordic_pts.add(c_pt_b)
-            if c_ty_r: dv_nordic_type.add(c_ty_r)
-            if c_ty_b: dv_nordic_type.add(c_ty_b)
+            if hasattr(c_pt_r, 'coordinate'): dv_nordic_pts.add(c_pt_r.coordinate)
+            if hasattr(c_pt_b, 'coordinate'): dv_nordic_pts.add(c_pt_b.coordinate)
+            if c_ty_r and hasattr(c_ty_r, 'coordinate'): dv_nordic_type.add(c_ty_r.coordinate)
+            if c_ty_b and hasattr(c_ty_b, 'coordinate'): dv_nordic_type.add(c_ty_b.coordinate)
             
             p1_nom = p1.get('Nom', '') if isinstance(p1, dict) else str(p1)
             p2_nom = p2.get('Nom', '') if isinstance(p2, dict) else str(p2)
@@ -3317,6 +3310,11 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
             f'IF(INDEX({plage_club}, MATCH(3, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(3, {plage_clt}, 0)) & ")", "")), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente")'
         )
         draw_excel_podium_card(ws, 10, col_pod, "🥉 3ème PLACE (BRONZE)", "En attente", fill_bronze, font_color="9A3412", formula_val=form_bronze)
+
+    if dv_nordic_pts.sqref and len(dv_nordic_pts.sqref) > 0:
+        ws.add_data_validation(dv_nordic_pts)
+    if dv_nordic_type.sqref and len(dv_nordic_type.sqref) > 0:
+        ws.add_data_validation(dv_nordic_type)
 
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
@@ -6896,9 +6894,6 @@ else:
                     dv_u9_u11 = DataValidation(type="list", formula1='"0,1,2"', allow_blank=True)
                     dv_u13 = DataValidation(type="list", formula1='"0,1,3,4,5"', allow_blank=True)
                     dv_type = DataValidation(type="list", formula1='"VT,VST,DT,DST"', allow_blank=True)
-                    ws_mat.add_data_validation(dv_u9_u11)
-                    ws_mat.add_data_validation(dv_u13)
-                    ws_mat.add_data_validation(dv_type)
                     
                     ws_mat.row_dimensions[1].height = 35
                     ws_mat.merge_cells(start_row=1, start_column=1, end_row=1, end_column=11)
@@ -6949,7 +6944,7 @@ else:
                             r_curr += 2
                         elif item["Type"] == "MATCH":
                             m_count_t += 1
-                            ws_mat.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=9)
+                            ws_mat.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=11)
                             arb_txt = f"  |  🛡️ Arbitre : {item['Arbitre']}" if item.get('Arbitre') and item['Arbitre'] != "Non attribué" else ""
                             tour_label = nettoyer_nom_tour(item.get('Nom_Tour') or item.get('Tour'))
                             tour_txt = f"  |  🎯 Tour : {tour_label}" if tour_label else ""
@@ -6963,15 +6958,15 @@ else:
                             
                             lien_suffix = "  |  🔗 Voir Poule" if sheet_cible else ""
                             hdr_text = f"MATCH N° {m_count_t}  |  🕘 {item['Heure']} ({item['Duree']} min)  |  Catégorie : {cat_item}{tour_txt}{arb_txt}{lien_suffix}"
-                            h_cell = ws_mat.cell(row=r_curr, column=1, value=hdr_text)
                             age_m = extraire_age_de_texte(cat_item)
                             cfg_m = COULEURS_AGE_GRILLE.get(age_m, COULEURS_AGE_GRILLE['AUTRE'])
-                            h_cell.fill, h_cell.alignment = cfg_m['bg_excel_header'], Alignment(horizontal="center", vertical="center")
                             if sheet_cible:
-                                h_cell.hyperlink = f"#'{sheet_cible}'!A1"
+                                h_cell = ws_mat.cell(row=r_curr, column=1, value=f'=HYPERLINK("#\'{sheet_cible}\'!A1", "{hdr_text}")')
                                 h_cell.font = Font(name="Arial", bold=True, color="FFFFFF", size=11, underline="single")
                             else:
+                                h_cell = ws_mat.cell(row=r_curr, column=1, value=hdr_text)
                                 h_cell.font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+                            h_cell.fill, h_cell.alignment = cfg_m['bg_excel_header'], Alignment(horizontal="center", vertical="center")
                             ws_mat.row_dimensions[r_curr].height = 24
                             r_curr += 1
 
@@ -7166,6 +7161,13 @@ else:
                                 coords_matchs_tapis[(cat_m, b_c2 or c2_m, b_c1 or c1_m)] = m_coord_info
                             
                             r_curr += 2 
+                    
+                    if dv_u9_u11.sqref and len(dv_u9_u11.sqref) > 0:
+                        ws_mat.add_data_validation(dv_u9_u11)
+                    if dv_u13.sqref and len(dv_u13.sqref) > 0:
+                        ws_mat.add_data_validation(dv_u13)
+                    if dv_type.sqref and len(dv_type.sqref) > 0:
+                        ws_mat.add_data_validation(dv_type)
                 
                 for ws_name in writer.book.sheetnames:
                     ws_sheet = writer.book[ws_name]

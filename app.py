@@ -1692,7 +1692,7 @@ def make_loser_formula(c_r, c_b, pt_r, pt_b, placeholder_name, target_corner="�
         f'"{default_text}")))'
     )
 
-def draw_excel_match_card(ws, start_row, start_col, title, p1, p2, cat_poule, coords_map=None, bg_header=None, end_col=None):
+def draw_excel_match_card(ws, start_row, start_col, title, p1, p2, cat_poule, coords_map=None, bg_header=None, end_col=None, with_details=False):
     b_thin = Side(style='thin', color='CBD5E1')
     b_style = Border(left=b_thin, right=b_thin, top=b_thin, bottom=b_thin)
     font_match_h = Font(name="Arial", size=9, bold=True, color="FFFFFF")
@@ -1704,7 +1704,100 @@ def draw_excel_match_card(ws, start_row, start_col, title, p1, p2, cat_poule, co
     fill_blue_card = PatternFill("solid", fgColor="EFF6FF")
     fill_gray_box = PatternFill("solid", fgColor="F8FAFC")
 
-    if end_col is not None and end_col > start_col + 1:
+    c_ty_r, c_ty_b, c_sc_r, c_sc_b = None, None, None, None
+
+    if with_details and end_col is not None and end_col > start_col + 3:
+        col1 = start_col
+        col2 = end_col
+        col_sc = end_col - 2
+        col_ty = end_col - 1
+        col_pt = end_col
+        col_nom_fin = col_sc - 1
+        
+        # En-tête du match
+        ws.merge_cells(start_row=start_row, start_column=col1, end_row=start_row, end_column=col_nom_fin)
+        c_h = ws.cell(row=start_row, column=col1, value=title)
+        c_h.font, c_h.fill = font_match_h, fill_header
+        c_h.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c_h_sc = ws.cell(row=start_row, column=col_sc, value="Score")
+        c_h_sc.font, c_h_sc.fill = font_match_h, fill_header
+        c_h_sc.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c_h_ty = ws.cell(row=start_row, column=col_ty, value="Type")
+        c_h_ty.font, c_h_ty.fill = font_match_h, fill_header
+        c_h_ty.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c_h_pt = ws.cell(row=start_row, column=col_pt, value="Pt Clt")
+        c_h_pt.font, c_h_pt.fill = font_match_h, fill_header
+        c_h_pt.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Combattant Rouge (fusionné de col1 à col_nom_fin)
+        ws.merge_cells(start_row=start_row+1, start_column=col1, end_row=start_row+1, end_column=col_nom_fin)
+        # Combattant Bleu (fusionné de col1 à col_nom_fin)
+        ws.merge_cells(start_row=start_row+2, start_column=col1, end_row=start_row+2, end_column=col_nom_fin)
+        
+        for r_k in range(start_row, start_row + 3):
+            for c_k in range(col1, col2 + 1):
+                ws.cell(row=r_k, column=c_k).border = b_style
+                if r_k == start_row:
+                    ws.cell(row=r_k, column=c_k).fill = fill_header
+                elif r_k == start_row + 1 and c_k <= col_nom_fin:
+                    ws.cell(row=r_k, column=c_k).fill = fill_red_card
+                elif r_k == start_row + 2 and c_k <= col_nom_fin:
+                    ws.cell(row=r_k, column=c_k).fill = fill_blue_card
+                    
+        # Combattant Rouge
+        nom1 = p1.get('Nom', '') if isinstance(p1, dict) else str(p1)
+        club1 = p1.get('Club', '') if isinstance(p1, dict) else ''
+        text_r = f"🔴 {nom1}" + (f" ({club1})" if club1 and club1 != '-' else "")
+        c_r = ws.cell(row=start_row+1, column=col1)
+        if isinstance(p1, dict) and 'formula' in p1:
+            c_r.value = p1['formula']
+        else:
+            c_r.value = text_r
+        c_r.font = font_p_bold
+        c_r.fill = fill_red_card
+        c_r.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        
+        c_sc_r = ws.cell(row=start_row+1, column=col_sc)
+        c_sc_r.font, c_sc_r.fill = font_pts, fill_gray_box
+        c_sc_r.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c_ty_r = ws.cell(row=start_row+1, column=col_ty)
+        c_ty_r.font, c_ty_r.fill = font_pts, fill_gray_box
+        c_ty_r.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c_pt_r = ws.cell(row=start_row+1, column=col_pt)
+        c_pt_r.font, c_pt_r.fill = font_pts, fill_gray_box
+        c_pt_r.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Combattant Bleu
+        nom2 = p2.get('Nom', '') if isinstance(p2, dict) else str(p2)
+        club2 = p2.get('Club', '') if isinstance(p2, dict) else ''
+        text_b = f"🔵 {nom2}" + (f" ({club2})" if club2 and club2 != '-' else "")
+        c_b = ws.cell(row=start_row+2, column=col1)
+        if isinstance(p2, dict) and 'formula' in p2:
+            c_b.value = p2['formula']
+        else:
+            c_b.value = text_b
+        c_b.font = font_p_bold
+        c_b.fill = fill_blue_card
+        c_b.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        
+        c_sc_b = ws.cell(row=start_row+2, column=col_sc)
+        c_sc_b.font, c_sc_b.fill = font_pts, fill_gray_box
+        c_sc_b.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c_ty_b = ws.cell(row=start_row+2, column=col_ty)
+        c_ty_b.font, c_ty_b.fill = font_pts, fill_gray_box
+        c_ty_b.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c_pt_b = ws.cell(row=start_row+2, column=col_pt)
+        c_pt_b.font, c_pt_b.fill = font_pts, fill_gray_box
+        c_pt_b.alignment = Alignment(horizontal="center", vertical="center")
+
+    elif end_col is not None and end_col > start_col + 1:
         col1 = start_col
         col2 = end_col
         # En-tête du match sur toute la largeur (col1..col2)
@@ -1728,6 +1821,46 @@ def draw_excel_match_card(ws, start_row, start_col, title, p1, p2, cat_poule, co
                     ws.cell(row=r_k, column=c_k).fill = fill_red_card
                 elif r_k == start_row + 2 and c_k < col2:
                     ws.cell(row=r_k, column=c_k).fill = fill_blue_card
+
+        # Combattant Rouge
+        nom1 = p1.get('Nom', '') if isinstance(p1, dict) else str(p1)
+        club1 = p1.get('Club', '') if isinstance(p1, dict) else ''
+        text_r = f"🔴 {nom1}" + (f" ({club1})" if club1 and club1 != '-' else "")
+        c_r = ws.cell(row=start_row+1, column=col1)
+        if isinstance(p1, dict) and 'formula' in p1:
+            c_r.value = p1['formula']
+        else:
+            c_r.value = text_r
+        c_r.font = font_p_bold
+        c_r.fill = fill_red_card
+        c_r.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        c_r.border = b_style
+        
+        c_pt_r = ws.cell(row=start_row+1, column=col2)
+        c_pt_r.font = font_pts
+        c_pt_r.fill = fill_gray_box
+        c_pt_r.alignment = Alignment(horizontal="center", vertical="center")
+        c_pt_r.border = b_style
+        
+        # Combattant Bleu
+        nom2 = p2.get('Nom', '') if isinstance(p2, dict) else str(p2)
+        club2 = p2.get('Club', '') if isinstance(p2, dict) else ''
+        text_b = f"🔵 {nom2}" + (f" ({club2})" if club2 and club2 != '-' else "")
+        c_b = ws.cell(row=start_row+2, column=col1)
+        if isinstance(p2, dict) and 'formula' in p2:
+            c_b.value = p2['formula']
+        else:
+            c_b.value = text_b
+        c_b.font = font_p_bold
+        c_b.fill = fill_blue_card
+        c_b.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        c_b.border = b_style
+        
+        c_pt_b = ws.cell(row=start_row+2, column=col2)
+        c_pt_b.font = font_pts
+        c_pt_b.fill = fill_gray_box
+        c_pt_b.alignment = Alignment(horizontal="center", vertical="center")
+        c_pt_b.border = b_style
     else:
         col1 = start_col
         col2 = start_col + 1
@@ -1740,46 +1873,46 @@ def draw_excel_match_card(ws, start_row, start_col, title, p1, p2, cat_poule, co
         c_h.alignment = Alignment(horizontal="center", vertical="center")
         c_h.border = b_style
         ws.cell(row=start_row, column=col2).border = b_style
-    
-    # Combattant Rouge
-    nom1 = p1.get('Nom', '') if isinstance(p1, dict) else str(p1)
-    club1 = p1.get('Club', '') if isinstance(p1, dict) else ''
-    text_r = f"🔴 {nom1}" + (f" ({club1})" if club1 and club1 != '-' else "")
-    c_r = ws.cell(row=start_row+1, column=col1)
-    if isinstance(p1, dict) and 'formula' in p1:
-        c_r.value = p1['formula']
-    else:
-        c_r.value = text_r
-    c_r.font = font_p_bold
-    c_r.fill = fill_red_card
-    c_r.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    c_r.border = b_style
-    
-    c_pt_r = ws.cell(row=start_row+1, column=col2)
-    c_pt_r.font = font_pts
-    c_pt_r.fill = fill_gray_box
-    c_pt_r.alignment = Alignment(horizontal="center", vertical="center")
-    c_pt_r.border = b_style
-    
-    # Combattant Bleu
-    nom2 = p2.get('Nom', '') if isinstance(p2, dict) else str(p2)
-    club2 = p2.get('Club', '') if isinstance(p2, dict) else ''
-    text_b = f"🔵 {nom2}" + (f" ({club2})" if club2 and club2 != '-' else "")
-    c_b = ws.cell(row=start_row+2, column=col1)
-    if isinstance(p2, dict) and 'formula' in p2:
-        c_b.value = p2['formula']
-    else:
-        c_b.value = text_b
-    c_b.font = font_p_bold
-    c_b.fill = fill_blue_card
-    c_b.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    c_b.border = b_style
-    
-    c_pt_b = ws.cell(row=start_row+2, column=col2)
-    c_pt_b.font = font_pts
-    c_pt_b.fill = fill_gray_box
-    c_pt_b.alignment = Alignment(horizontal="center", vertical="center")
-    c_pt_b.border = b_style
+
+        # Combattant Rouge
+        nom1 = p1.get('Nom', '') if isinstance(p1, dict) else str(p1)
+        club1 = p1.get('Club', '') if isinstance(p1, dict) else ''
+        text_r = f"🔴 {nom1}" + (f" ({club1})" if club1 and club1 != '-' else "")
+        c_r = ws.cell(row=start_row+1, column=col1)
+        if isinstance(p1, dict) and 'formula' in p1:
+            c_r.value = p1['formula']
+        else:
+            c_r.value = text_r
+        c_r.font = font_p_bold
+        c_r.fill = fill_red_card
+        c_r.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        c_r.border = b_style
+        
+        c_pt_r = ws.cell(row=start_row+1, column=col2)
+        c_pt_r.font = font_pts
+        c_pt_r.fill = fill_gray_box
+        c_pt_r.alignment = Alignment(horizontal="center", vertical="center")
+        c_pt_r.border = b_style
+        
+        # Combattant Bleu
+        nom2 = p2.get('Nom', '') if isinstance(p2, dict) else str(p2)
+        club2 = p2.get('Club', '') if isinstance(p2, dict) else ''
+        text_b = f"🔵 {nom2}" + (f" ({club2})" if club2 and club2 != '-' else "")
+        c_b = ws.cell(row=start_row+2, column=col1)
+        if isinstance(p2, dict) and 'formula' in p2:
+            c_b.value = p2['formula']
+        else:
+            c_b.value = text_b
+        c_b.font = font_p_bold
+        c_b.fill = fill_blue_card
+        c_b.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        c_b.border = b_style
+        
+        c_pt_b = ws.cell(row=start_row+2, column=col2)
+        c_pt_b.font = font_pts
+        c_pt_b.fill = fill_gray_box
+        c_pt_b.alignment = Alignment(horizontal="center", vertical="center")
+        c_pt_b.border = b_style
 
     if coords_map:
         m_info = coords_map.get((cat_poule, nom1, nom2))
@@ -1807,18 +1940,43 @@ def draw_excel_match_card(ws, start_row, start_col, title, p1, p2, cat_poule, co
             bp1 = re.sub(r'\s*\[.*?\]', '', str(m_info.get('p1', ''))).strip()
             ptr_c = m_info.get('ptr_cell')
             ptb_c = m_info.get('ptb_cell')
+            typer_c = m_info.get('typer_cell')
+            typeb_c = m_info.get('typeb_cell')
+            totr_c = m_info.get('tot_r_cell')
+            totb_c = m_info.get('tot_b_cell')
             if not ptr_c and 'ptr' in m_info and hasattr(m_info['ptr'], 'coordinate'):
                 ptr_c = m_info['ptr'].coordinate
             if not ptb_c and 'ptb' in m_info and hasattr(m_info['ptb'], 'coordinate'):
                 ptb_c = m_info['ptb'].coordinate
+            
+            is_p1_red = (nom1 == m_info.get('p1') or (b1 and b1 == bp1) or (b1 and b1 in bp1) or (bp1 and bp1 in b1))
+            
             if s_name and ptr_c and ptb_c:
-                if nom1 == m_info.get('p1') or (b1 and b1 == bp1) or (b1 and b1 in bp1) or (bp1 and bp1 in b1):
+                if is_p1_red:
                     c_pt_r.value = f"=IF('{s_name}'!{ptr_c}<>\"\", '{s_name}'!{ptr_c}, \"\")"
                     c_pt_b.value = f"=IF('{s_name}'!{ptb_c}<>\"\", '{s_name}'!{ptb_c}, \"\")"
                 else:
                     c_pt_r.value = f"=IF('{s_name}'!{ptb_c}<>\"\", '{s_name}'!{ptb_c}, \"\")"
                     c_pt_b.value = f"=IF('{s_name}'!{ptr_c}<>\"\", '{s_name}'!{ptr_c}, \"\")"
+            
+            if with_details and s_name:
+                if typer_c and typeb_c and c_ty_r and c_ty_b:
+                    if is_p1_red:
+                        c_ty_r.value = f"=IF('{s_name}'!{typer_c}<>\"\", '{s_name}'!{typer_c}, \"\")"
+                        c_ty_b.value = f"=IF('{s_name}'!{typeb_c}<>\"\", '{s_name}'!{typeb_c}, \"\")"
+                    else:
+                        c_ty_r.value = f"=IF('{s_name}'!{typeb_c}<>\"\", '{s_name}'!{typeb_c}, \"\")"
+                        c_ty_b.value = f"=IF('{s_name}'!{typer_c}<>\"\", '{s_name}'!{typer_c}, \"\")"
+                if totr_c and totb_c and c_sc_r and c_sc_b:
+                    if is_p1_red:
+                        c_sc_r.value = f"=IF('{s_name}'!{totr_c}<>\"\", '{s_name}'!{totr_c}, 0)"
+                        c_sc_b.value = f"=IF('{s_name}'!{totb_c}<>\"\", '{s_name}'!{totb_c}, 0)"
+                    else:
+                        c_sc_r.value = f"=IF('{s_name}'!{totb_c}<>\"\", '{s_name}'!{totb_c}, 0)"
+                        c_sc_b.value = f"=IF('{s_name}'!{totr_c}<>\"\", '{s_name}'!{totr_c}, 0)"
 
+    if with_details:
+        return c_pt_r, c_pt_b, c_r, c_b, c_ty_r, c_ty_b, c_sc_r, c_sc_b
     return c_pt_r, c_pt_b, c_r, c_b
 
 
@@ -2817,23 +2975,47 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
     
     # Titre officiel FFLDA & sous-titre
     ws.cell(row=1, column=1, value=f"COMPÉTITION : {nom_competition.upper()} — POULE OFFICIELLE : {nom_poule}").font = font_title
-    ws.cell(row=2, column=1, value="Formule officielle FFLDA : Tournoi nordique (Tous contre tous) — Point de classement : 2 pt = victoire, 1 pt = nul, 0 pt = défaite").font = font_sub
+    ws.cell(row=2, column=1, value="Formule officielle FFLDA : Tournoi nordique (Tous contre tous) — Départage : Victoires ➔ Rencontre directe (si 2) ➔ Pt Clt ➔ VT ➔ VST ➔ Pts marqués ➔ Pts concédés ➔ N° Tirage").font = font_sub
     if tapis_num:
         c_ret = ws.cell(row=3, column=1, value=f"⬅️ Revenir à la Grille Tapis {tapis_num}")
         c_ret.hyperlink = f"#'Grille Tapis {tapis_num}'!A1"
         c_ret.font = Font(name="Arial", size=9, bold=True, color="0055A4", underline="single")
 
+    is_u13_nordique = "u13" in nom_poule.lower()
+    seuil_vict = 3 if is_u13_nordique else 2
+
+    dv_nordic_type = DataValidation(type="list", formula1='"VT,VST,DT,DST"', allow_blank=True)
+    ws.add_data_validation(dv_nordic_type)
+    
+    dv_nordic_pts = DataValidation(type="list", formula1='"0,1,3,4,5"' if is_u13_nordique else '"0,1,2"', allow_blank=True)
+    ws.add_data_validation(dv_nordic_pts)
+
     nb_tours = len(rondes) if rondes else 0
     headers = ["CLT", "N°", "NOM Prénom", "CLUB", "COMITÉ"]
     for t in range(1, nb_tours + 1):
         headers.append(f"Tour {t}")
-    headers.extend(["Total Pts", "Total Vict", "Poids"])
+    headers.extend(["Total Vict", "Total Pts", "VT", "VST", "Pts Marq.", "Pts Conc.", "Poids"])
     
-    col_fin_table = len(headers)
-    col_pts_idx = 6 + nb_tours
-    col_vict_idx = 7 + nb_tours
-    col_poids_idx = 8 + nb_tours
+    col_vict_idx = 6 + nb_tours
+    col_pts_idx = 7 + nb_tours
+    col_vt_idx = 8 + nb_tours
+    col_vst_idx = 9 + nb_tours
+    col_marq_idx = 10 + nb_tours
+    col_conc_idx = 11 + nb_tours
+    col_poids_idx = 12 + nb_tours
+    col_fin_table = col_poids_idx
     
+    col_vict_lettre = get_column_letter(col_vict_idx)
+    col_pts_lettre = get_column_letter(col_pts_idx)
+    col_vt_lettre = get_column_letter(col_vt_idx)
+    col_vst_lettre = get_column_letter(col_vst_idx)
+    col_marq_lettre = get_column_letter(col_marq_idx)
+    col_conc_lettre = get_column_letter(col_conc_idx)
+    col_poids_lettre = get_column_letter(col_poids_idx)
+    col_num_lettre = "B"
+    col_debut_tours_lettre = get_column_letter(6)
+    col_fin_tours_lettre = get_column_letter(5 + nb_tours) if nb_tours > 0 else col_pts_lettre
+
     row_cursor = 4
     for col_idx, h in enumerate(headers, 1):
         c = ws.cell(row=row_cursor, column=col_idx, value=h)
@@ -2842,14 +3024,13 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
         
     lignes_lutteurs = {}
     ligne_debut_poule = row_cursor + 1
+    ligne_fin_poule = ligne_debut_poule + len(liste_p) - 1
     
-    col_pts_lettre = get_column_letter(col_pts_idx)
-    col_debut_tours_lettre = get_column_letter(6)
-    col_fin_tours_lettre = get_column_letter(5 + nb_tours) if nb_tours > 0 else col_pts_lettre
-    plage_totaux = f"${col_pts_lettre}${ligne_debut_poule}:${col_pts_lettre}${ligne_debut_poule + len(liste_p) - 1}"
-    plage_clt = f"$A${ligne_debut_poule}:$A${ligne_debut_poule + len(liste_p) - 1}"
-    plage_nom = f"$C${ligne_debut_poule}:$C${ligne_debut_poule + len(liste_p) - 1}"
-    plage_club = f"$D${ligne_debut_poule}:$D${ligne_debut_poule + len(liste_p) - 1}"
+    plage_totaux = f"${col_pts_lettre}${ligne_debut_poule}:${col_pts_lettre}${ligne_fin_poule}"
+    plage_vict = f"${col_vict_lettre}${ligne_debut_poule}:${col_vict_lettre}${ligne_fin_poule}"
+    plage_clt = f"$A${ligne_debut_poule}:$A${ligne_fin_poule}"
+    plage_nom = f"$C${ligne_debut_poule}:$C${ligne_fin_poule}"
+    plage_club = f"$D${ligne_debut_poule}:$D${ligne_fin_poule}"
 
     # Correspondance des combats directs entre lutteurs pour le départage FFLDA
     match_col_map = {}
@@ -2872,44 +3053,6 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
         r = ligne_debut_poule + idx - 1
         lignes_lutteurs[p['Nom']] = r
         
-        # Formule CLT officielle FFLDA : classement par Total Pts, avec départage au combat direct en cas d'égalité
-        comparisons = []
-        for idx_j, p_j in enumerate(liste_p, 1):
-            if idx_j == idx:
-                continue
-            r_j = ligne_debut_poule + idx_j - 1
-            col_t_lettre = match_col_map.get((p['Nom'], p_j['Nom']))
-            
-            if col_t_lettre:
-                # Si j a plus de points que r, j est devant (+1).
-                # Si j a moins de points que r, j est derrière (+0).
-                # En cas d'égalité de points totaux (col_pts_lettre), départage par la victoire directe (col_t_lettre) :
-                # Si j a battu r au combat direct, j est devant (+1). Si r a battu j, r est devant (+0).
-                # En cas d'égalité absolue (ex: match nul direct 1-1 ou 0-0), départage résiduel par la ligne.
-                comp = (
-                    f"IF({col_pts_lettre}{r_j}>{col_pts_lettre}{r}, 1, "
-                    f"IF({col_pts_lettre}{r_j}<{col_pts_lettre}{r}, 0, "
-                    f"IF({col_t_lettre}{r_j}>{col_t_lettre}{r}, 1, "
-                    f"IF({col_t_lettre}{r_j}<{col_t_lettre}{r}, 0, "
-                    f"IF({r_j}<{r}, 1, 0)))))"
-                )
-            else:
-                comp = f"IF({col_pts_lettre}{r_j}>{col_pts_lettre}{r}, 1, IF({col_pts_lettre}{r_j}<{col_pts_lettre}{r}, 0, IF({r_j}<{r}, 1, 0)))"
-            comparisons.append(comp)
-
-        if comparisons:
-            somme_comp = " + ".join(comparisons)
-            if len(liste_p) > 2:
-                form_clt = f'=IF(OR(SUM({plage_totaux})=0, {col_pts_lettre}{r}=0), "", 1 + {somme_comp})'
-            else:
-                form_clt = f'=IF(SUM({plage_totaux})=0, "", 1 + {somme_comp})'
-        else:
-            form_clt = f'=IF(SUM({plage_totaux})=0, "", 1)'
-
-        c_clt = ws.cell(row=r, column=1, value=form_clt)
-        c_clt.alignment, c_clt.border = Alignment(horizontal="center", vertical="center"), b_style
-        c_clt.font = Font(name="Arial", size=10, bold=True, color="0055A4")
-        
         c_num = ws.cell(row=r, column=2, value=idx)
         c_num.alignment, c_num.border = Alignment(horizontal="center", vertical="center"), b_style
         
@@ -2922,16 +3065,23 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
         c_comite = ws.cell(row=r, column=5, value=p.get('Comité', ''))
         c_comite.border = b_style
         
+        # Total Vict
+        c_tot_vict = ws.cell(row=r, column=col_vict_idx)
         if nb_tours > 0:
-            c_tot_pts = ws.cell(row=r, column=col_pts_idx, value=f"=SUM({col_debut_tours_lettre}{r}:{col_fin_tours_lettre}{r})")
-            c_tot_vict = ws.cell(row=r, column=col_vict_idx, value=f"=COUNTIF({col_debut_tours_lettre}{r}:{col_fin_tours_lettre}{r}, 2)")
+            c_tot_vict.value = f'=COUNTIF({col_debut_tours_lettre}{r}:{col_fin_tours_lettre}{r}, ">={seuil_vict}")'
         else:
-            c_tot_pts = ws.cell(row=r, column=col_pts_idx, value=0)
-            c_tot_vict = ws.cell(row=r, column=col_vict_idx, value="")
-            
-        c_tot_pts.font, c_tot_pts.alignment, c_tot_pts.border = font_pts, Alignment(horizontal="center", vertical="center"), b_style
-        c_tot_vict.alignment, c_tot_vict.border = Alignment(horizontal="center", vertical="center"), b_style
+            c_tot_vict.value = 0
+        c_tot_vict.font, c_tot_vict.alignment, c_tot_vict.border = font_pts, Alignment(horizontal="center", vertical="center"), b_style
         
+        # Total Pts
+        c_tot_pts = ws.cell(row=r, column=col_pts_idx)
+        if nb_tours > 0:
+            c_tot_pts.value = f"=SUM({col_debut_tours_lettre}{r}:{col_fin_tours_lettre}{r})"
+        else:
+            c_tot_pts.value = 0
+        c_tot_pts.font, c_tot_pts.alignment, c_tot_pts.border = font_pts, Alignment(horizontal="center", vertical="center"), b_style
+        
+        # Poids
         c_poids = ws.cell(row=r, column=col_poids_idx, value=formater_poids(p.get('Poids', '')))
         c_poids.alignment, c_poids.border = Alignment(horizontal="center", vertical="center"), b_style
         
@@ -2945,69 +3095,16 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
             if t < len(lutteurs_par_tour) and p['Nom'] in lutteurs_par_tour[t]:
                 c_tour.fill = fill_active_match
 
-    # Ajustement dynamique des largeurs de colonnes
-    max_len_nom = max([len(str(p.get('Nom', ''))) for p in liste_p] + [12])
-    max_len_club = max([len(str(p.get('Club', ''))) for p in liste_p if p.get('Club') and p.get('Club') != '-'] + [10])
-    max_len_comite = max([len(str(p.get('Comité', ''))) for p in liste_p if p.get('Comité') and p.get('Comité') != '-'] + [10])
-
-    ws.column_dimensions['A'].width = 6
-    ws.column_dimensions['B'].width = 5
-    ws.column_dimensions['C'].width = max(max_len_nom + 4, 24)
-    ws.column_dimensions['D'].width = max(max_len_club + 4, 16)
-    ws.column_dimensions['E'].width = max(max_len_comite + 4, 16)
-    for t in range(nb_tours):
-        col_t_lettre = get_column_letter(6 + t)
-        ws.column_dimensions[col_t_lettre].width = 9
-    ws.column_dimensions[col_pts_lettre].width = 11
-    ws.column_dimensions[get_column_letter(col_vict_idx)].width = 11
-    ws.column_dimensions[get_column_letter(col_poids_idx)].width = 10
-
-    # Cartes Podium Dynamiques (reliées au classement)
-    col_pod = col_poids_idx + 2
-    col_pod_lettre1 = get_column_letter(col_pod)
-    col_pod_lettre2 = get_column_letter(col_pod + 1)
-    ws.column_dimensions[get_column_letter(col_pod - 1)].width = 3
-    ws.column_dimensions[col_pod_lettre1].width = 16
-    ws.column_dimensions[col_pod_lettre2].width = 16
-    
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=col_pod+1)
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=col_pod+1)
-    
-    if len(liste_p) > 2:
-        form_gold = (
-            f'=IFERROR(IF(OR(SUM({plage_totaux})=0, INDEX({plage_totaux}, MATCH(1, {plage_clt}, 0))=0), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
-            f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", "")), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente")'
-        )
-        form_silver = (
-            f'=IFERROR(IF(OR(SUM({plage_totaux})=0, INDEX({plage_totaux}, MATCH(2, {plage_clt}, 0))=0), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
-            f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", "")), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente")'
-        )
-    else:
-        form_gold = (
-            f'=IFERROR(IF(SUM({plage_totaux})=0, "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
-            f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", "")), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente")'
-        )
-        form_silver = (
-            f'=IFERROR(IF(SUM({plage_totaux})=0, "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
-            f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", "")), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente")'
-        )
-    
-    draw_excel_podium_card(ws, 4, col_pod, "🥇 CHAMPION (OR)", "En attente", fill_gold, font_color="B45309", formula_val=form_gold)
-    draw_excel_podium_card(ws, 7, col_pod, "🥈 VICE-CHAMPION (ARGENT)", "En attente", fill_silver, font_color="475569", formula_val=form_silver)
-    
-    if len(liste_p) >= 3:
-        form_bronze = (
-            f'=IFERROR(IF(OR(SUM({plage_totaux})=0, INDEX({plage_totaux}, MATCH(3, {plage_clt}, 0))=0), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente", '
-            f'"🥉 3ème PLACE (BRONZE)" & CHAR(10) & INDEX({plage_nom}, MATCH(3, {plage_clt}, 0)) & '
-            f'IF(INDEX({plage_club}, MATCH(3, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(3, {plage_clt}, 0)) & ")", "")), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente")'
-        )
-        draw_excel_podium_card(ws, 10, col_pod, "🥉 3ème PLACE (BRONZE)", "En attente", fill_bronze, font_color="9A3412", formula_val=form_bronze)
-
     # Fiches de combat modernes en bas de feuille
+    lutteur_cells = {
+        p['Nom']: {
+            'type_cells': [],
+            'marq_cells': [],
+            'conc_cells': []
+        }
+        for p in liste_p
+    }
+
     row_cursor = max(ligne_debut_poule + len(liste_p) + 2, 13)
     match_cpt = 1
     
@@ -3025,7 +3122,7 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
             p1, p2 = match[0], match[1]
             m_title = f"COMBAT N°{match_cpt} (TOUR {tour_idx})"
             
-            c_pt_r, c_pt_b, c_r, c_b = draw_excel_match_card(
+            c_pt_r, c_pt_b, c_r, c_b, c_ty_r, c_ty_b, c_sc_r, c_sc_b = draw_excel_match_card(
                 ws=ws,
                 start_row=row_cursor,
                 start_col=1,
@@ -3035,19 +3132,191 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
                 cat_poule=nom_poule,
                 coords_map=coords_matchs_tapis,
                 bg_header=fill_gray_h,
-                end_col=col_fin_table
+                end_col=col_fin_table,
+                with_details=True
             )
             
-            if p1['Nom'] in lignes_lutteurs:
-                lig1 = lignes_lutteurs[p1['Nom']]
+            dv_nordic_pts.add(c_pt_r)
+            dv_nordic_pts.add(c_pt_b)
+            if c_ty_r: dv_nordic_type.add(c_ty_r)
+            if c_ty_b: dv_nordic_type.add(c_ty_b)
+            
+            p1_nom = p1.get('Nom', '') if isinstance(p1, dict) else str(p1)
+            p2_nom = p2.get('Nom', '') if isinstance(p2, dict) else str(p2)
+            
+            if p1_nom in lignes_lutteurs:
+                lig1 = lignes_lutteurs[p1_nom]
                 ws.cell(row=lig1, column=6 + (tour_idx - 1), value=f"={c_pt_r.coordinate}").alignment = Alignment(horizontal="center", vertical="center")
-            if p2['Nom'] in lignes_lutteurs:
-                lig2 = lignes_lutteurs[p2['Nom']]
+            if p2_nom in lignes_lutteurs:
+                lig2 = lignes_lutteurs[p2_nom]
                 ws.cell(row=lig2, column=6 + (tour_idx - 1), value=f"={c_pt_b.coordinate}").alignment = Alignment(horizontal="center", vertical="center")
+                
+            if p1_nom in lutteur_cells:
+                if c_ty_r: lutteur_cells[p1_nom]['type_cells'].append(c_ty_r.coordinate)
+                if c_sc_r: lutteur_cells[p1_nom]['marq_cells'].append(c_sc_r.coordinate)
+                if c_sc_b: lutteur_cells[p1_nom]['conc_cells'].append(c_sc_b.coordinate)
+            if p2_nom in lutteur_cells:
+                if c_ty_b: lutteur_cells[p2_nom]['type_cells'].append(c_ty_b.coordinate)
+                if c_sc_b: lutteur_cells[p2_nom]['marq_cells'].append(c_sc_b.coordinate)
+                if c_sc_r: lutteur_cells[p2_nom]['conc_cells'].append(c_sc_r.coordinate)
                 
             match_cpt += 1
             row_cursor += 4
         row_cursor += 1
+
+    # Remplissage des statistiques FFLDA (VT, VST, Pts Marq., Pts Conc.) et calcul du CLT
+    for idx, p in enumerate(liste_p, 1):
+        r = ligne_debut_poule + idx - 1
+        p_nom = p['Nom']
+        l_info = lutteur_cells.get(p_nom, {'type_cells': [], 'marq_cells': [], 'conc_cells': []})
+        
+        # VT (Victoires par tombé)
+        c_vt = ws.cell(row=r, column=col_vt_idx)
+        if l_info['type_cells']:
+            c_vt.value = "=" + " + ".join([f'COUNTIF({coord}, "VT")' for coord in l_info['type_cells']])
+        else:
+            c_vt.value = 0
+        c_vt.alignment, c_vt.border = Alignment(horizontal="center", vertical="center"), b_style
+        
+        # VST (Victoires par supériorité technique)
+        c_vst = ws.cell(row=r, column=col_vst_idx)
+        if l_info['type_cells']:
+            c_vst.value = "=" + " + ".join([f'COUNTIF({coord}, "VST")' for coord in l_info['type_cells']])
+        else:
+            c_vst.value = 0
+        c_vst.alignment, c_vst.border = Alignment(horizontal="center", vertical="center"), b_style
+        
+        # Pts Marq. (Points techniques marqués - Total Score)
+        c_marq = ws.cell(row=r, column=col_marq_idx)
+        if l_info['marq_cells']:
+            c_marq.value = f"=SUM({', '.join(l_info['marq_cells'])})"
+        else:
+            c_marq.value = 0
+        c_marq.alignment, c_marq.border = Alignment(horizontal="center", vertical="center"), b_style
+        
+        # Pts Conc. (Points techniques concédés - Total Score adverse)
+        c_conc = ws.cell(row=r, column=col_conc_idx)
+        if l_info['conc_cells']:
+            c_conc.value = f"=SUM({', '.join(l_info['conc_cells'])})"
+        else:
+            c_conc.value = 0
+        c_conc.alignment, c_conc.border = Alignment(horizontal="center", vertical="center"), b_style
+        
+        # Formule CLT officielle FFLDA complète :
+        # 1. Total Victoires
+        # 2. Rencontre directe si 2 lutteurs à égalité de victoires
+        # 3. Si 3+ lutteurs : Total Pts (Pt Clt)
+        # 4. VT (Victoires par tombé)
+        # 5. VST (Victoires par supériorité technique)
+        # 6. Pts Marq. (Points techniques marqués - Total Score)
+        # 7. Pts Conc. (Points techniques concédés - Le plus petit nombre)
+        # 8. N° Tirage au sort le plus bas
+        comparisons = []
+        for idx_j, p_j in enumerate(liste_p, 1):
+            if idx_j == idx:
+                continue
+            r_j = ligne_debut_poule + idx_j - 1
+            col_t_lettre = match_col_map.get((p['Nom'], p_j['Nom']))
+            
+            if col_t_lettre:
+                comp = (
+                    f"IF({col_vict_lettre}{r_j}>{col_vict_lettre}{r}, 1, "
+                    f"IF({col_vict_lettre}{r_j}<{col_vict_lettre}{r}, 0, "
+                    f"IF(AND(COUNTIF({plage_vict}, {col_vict_lettre}{r})=2, {col_t_lettre}{r_j}>{col_t_lettre}{r}), 1, "
+                    f"IF(AND(COUNTIF({plage_vict}, {col_vict_lettre}{r})=2, {col_t_lettre}{r_j}<{col_t_lettre}{r}), 0, "
+                    f"IF({col_pts_lettre}{r_j}>{col_pts_lettre}{r}, 1, "
+                    f"IF({col_pts_lettre}{r_j}<{col_pts_lettre}{r}, 0, "
+                    f"IF({col_vt_lettre}{r_j}>{col_vt_lettre}{r}, 1, "
+                    f"IF({col_vt_lettre}{r_j}<{col_vt_lettre}{r}, 0, "
+                    f"IF({col_vst_lettre}{r_j}>{col_vst_lettre}{r}, 1, "
+                    f"IF({col_vst_lettre}{r_j}<{col_vst_lettre}{r}, 0, "
+                    f"IF({col_marq_lettre}{r_j}>{col_marq_lettre}{r}, 1, "
+                    f"IF({col_marq_lettre}{r_j}<{col_marq_lettre}{r}, 0, "
+                    f"IF({col_conc_lettre}{r_j}<{col_conc_lettre}{r}, 1, "
+                    f"IF({col_conc_lettre}{r_j}>{col_conc_lettre}{r}, 0, "
+                    f"IF({col_num_lettre}{r_j}<{col_num_lettre}{r}, 1, 0)))))))))))))))"
+                )
+            else:
+                comp = (
+                    f"IF({col_vict_lettre}{r_j}>{col_vict_lettre}{r}, 1, "
+                    f"IF({col_vict_lettre}{r_j}<{col_vict_lettre}{r}, 0, "
+                    f"IF({col_pts_lettre}{r_j}>{col_pts_lettre}{r}, 1, "
+                    f"IF({col_pts_lettre}{r_j}<{col_pts_lettre}{r}, 0, "
+                    f"IF({col_vt_lettre}{r_j}>{col_vt_lettre}{r}, 1, "
+                    f"IF({col_vt_lettre}{r_j}<{col_vt_lettre}{r}, 0, "
+                    f"IF({col_vst_lettre}{r_j}>{col_vst_lettre}{r}, 1, "
+                    f"IF({col_vst_lettre}{r_j}<{col_vst_lettre}{r}, 0, "
+                    f"IF({col_marq_lettre}{r_j}>{col_marq_lettre}{r}, 1, "
+                    f"IF({col_marq_lettre}{r_j}<{col_marq_lettre}{r}, 0, "
+                    f"IF({col_conc_lettre}{r_j}<{col_conc_lettre}{r}, 1, "
+                    f"IF({col_conc_lettre}{r_j}>{col_conc_lettre}{r}, 0, "
+                    f"IF({col_num_lettre}{r_j}<{col_num_lettre}{r}, 1, 0)))))))))))))"
+                )
+            comparisons.append(comp)
+
+        if comparisons:
+            somme_comp = " + ".join(comparisons)
+            form_clt = f'=IF(SUM({plage_totaux})=0, "", 1 + {somme_comp})'
+        else:
+            form_clt = f'=IF(SUM({plage_totaux})=0, "", 1)'
+
+        c_clt = ws.cell(row=r, column=1, value=form_clt)
+        c_clt.alignment, c_clt.border = Alignment(horizontal="center", vertical="center"), b_style
+        c_clt.font = Font(name="Arial", size=10, bold=True, color="0055A4")
+
+    # Ajustement dynamique des largeurs de colonnes
+    max_len_nom = max([len(str(p.get('Nom', ''))) for p in liste_p] + [12])
+    max_len_club = max([len(str(p.get('Club', ''))) for p in liste_p if p.get('Club') and p.get('Club') != '-'] + [10])
+    max_len_comite = max([len(str(p.get('Comité', ''))) for p in liste_p if p.get('Comité') and p.get('Comité') != '-'] + [10])
+
+    ws.column_dimensions['A'].width = 6
+    ws.column_dimensions['B'].width = 5
+    ws.column_dimensions['C'].width = max(max_len_nom + 4, 24)
+    ws.column_dimensions['D'].width = max(max_len_club + 4, 16)
+    ws.column_dimensions['E'].width = max(max_len_comite + 4, 16)
+    for t in range(nb_tours):
+        col_t_lettre = get_column_letter(6 + t)
+        ws.column_dimensions[col_t_lettre].width = 9
+    ws.column_dimensions[col_vict_lettre].width = 11
+    ws.column_dimensions[col_pts_lettre].width = 11
+    ws.column_dimensions[col_vt_lettre].width = 7
+    ws.column_dimensions[col_vst_lettre].width = 7
+    ws.column_dimensions[col_marq_lettre].width = 11
+    ws.column_dimensions[col_conc_lettre].width = 11
+    ws.column_dimensions[col_poids_lettre].width = 10
+
+    # Cartes Podium Dynamiques (reliées au classement)
+    col_pod = col_poids_idx + 2
+    col_pod_lettre1 = get_column_letter(col_pod)
+    col_pod_lettre2 = get_column_letter(col_pod + 1)
+    ws.column_dimensions[get_column_letter(col_pod - 1)].width = 3
+    ws.column_dimensions[col_pod_lettre1].width = 16
+    ws.column_dimensions[col_pod_lettre2].width = 16
+    
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=col_pod+1)
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=col_pod+1)
+    
+    form_gold = (
+        f'=IFERROR(IF(SUM({plage_totaux})=0, "🥇 CHAMPION (OR)" & CHAR(10) & "En attente", '
+        f'"🥇 CHAMPION (OR)" & CHAR(10) & INDEX({plage_nom}, MATCH(1, {plage_clt}, 0)) & '
+        f'IF(INDEX({plage_club}, MATCH(1, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(1, {plage_clt}, 0)) & ")", "")), "🥇 CHAMPION (OR)" & CHAR(10) & "En attente")'
+    )
+    form_silver = (
+        f'=IFERROR(IF(SUM({plage_totaux})=0, "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente", '
+        f'"🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & INDEX({plage_nom}, MATCH(2, {plage_clt}, 0)) & '
+        f'IF(INDEX({plage_club}, MATCH(2, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(2, {plage_clt}, 0)) & ")", "")), "🥈 VICE-CHAMPION (ARGENT)" & CHAR(10) & "En attente")'
+    )
+    
+    draw_excel_podium_card(ws, 4, col_pod, "🥇 CHAMPION (OR)", "En attente", fill_gold, font_color="B45309", formula_val=form_gold)
+    draw_excel_podium_card(ws, 7, col_pod, "🥈 VICE-CHAMPION (ARGENT)", "En attente", fill_silver, font_color="475569", formula_val=form_silver)
+    
+    if len(liste_p) >= 3:
+        form_bronze = (
+            f'=IFERROR(IF(SUM({plage_totaux})=0, "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente", '
+            f'"🥉 3ème PLACE (BRONZE)" & CHAR(10) & INDEX({plage_nom}, MATCH(3, {plage_clt}, 0)) & '
+            f'IF(INDEX({plage_club}, MATCH(3, {plage_clt}, 0))<>"", " (" & INDEX({plage_club}, MATCH(3, {plage_clt}, 0)) & ")", "")), "🥉 3ème PLACE (BRONZE)" & CHAR(10) & "En attente")'
+        )
+        draw_excel_podium_card(ws, 10, col_pod, "🥉 3ème PLACE (BRONZE)", "En attente", fill_bronze, font_color="9A3412", formula_val=form_bronze)
 
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
@@ -4549,6 +4818,62 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
 
         return int(round(pts))
 
+    def collecter_stats_lutteur_nordique(wb, nom_lutteur, nom_poule):
+        stats = {
+            'vict': 0,
+            'pt_clt': 0.0,
+            'vt': 0,
+            'vst': 0,
+            'pts_marq': 0.0,
+            'pts_conc': 0.0,
+            'face_a_face': {}
+        }
+        for s_name in wb.sheetnames:
+            if not s_name.lower().startswith("grille tapis"):
+                continue
+            ws_t = wb[s_name]
+            for r_m in range(4, ws_t.max_row, 4):
+                val_r = str(ws_t.cell(row=r_m, column=3).value or "")
+                val_b = str(ws_t.cell(row=r_m, column=8).value or "")
+                if not val_r and not val_b:
+                    continue
+                is_r = comparer_nom_lutteur_podium(nom_lutteur, val_r)
+                is_b = comparer_nom_lutteur_podium(nom_lutteur, val_b)
+                if not is_r and not is_b:
+                    continue
+                
+                ptr_val = extraire_valeur_numerique_cellule(ws_t.cell(row=r_m, column=5).value, None, ws_t)
+                typer_val = str(ws_t.cell(row=r_m, column=6).value or "").strip().upper()
+                ptb_val = extraire_valeur_numerique_cellule(ws_t.cell(row=r_m, column=10).value, None, ws_t)
+                typeb_val = str(ws_t.cell(row=r_m, column=11).value or "").strip().upper()
+                
+                tot_r = extraire_valeur_numerique_cellule(ws_t.cell(row=r_m+2, column=5).value, None, ws_t)
+                tot_b = extraire_valeur_numerique_cellule(ws_t.cell(row=r_m+2, column=10).value, None, ws_t)
+                
+                if is_r:
+                    stats['pt_clt'] += ptr_val
+                    stats['pts_marq'] += tot_r
+                    stats['pts_conc'] += tot_b
+                    if "VT" in typer_val: stats['vt'] += 1
+                    if "VST" in typer_val: stats['vst'] += 1
+                    if ptr_val > ptb_val or typer_val in ['VT', 'VST'] or (ptr_val == ptb_val and tot_r > tot_b and tot_r > 0):
+                        stats['vict'] += 1
+                        stats['face_a_face'][val_b] = 1
+                    elif ptb_val > ptr_val or typeb_val in ['VT', 'VST'] or (ptr_val == ptb_val and tot_b > tot_r and tot_b > 0):
+                        stats['face_a_face'][val_b] = -1
+                else:
+                    stats['pt_clt'] += ptb_val
+                    stats['pts_marq'] += tot_b
+                    stats['pts_conc'] += tot_r
+                    if "VT" in typeb_val: stats['vt'] += 1
+                    if "VST" in typeb_val: stats['vst'] += 1
+                    if ptb_val > ptr_val or typeb_val in ['VT', 'VST'] or (ptr_val == ptb_val and tot_b > tot_r and tot_b > 0):
+                        stats['vict'] += 1
+                        stats['face_a_face'][val_r] = 1
+                    elif ptr_val > ptb_val or typer_val in ['VT', 'VST'] or (ptr_val == ptb_val and tot_r > tot_b and tot_r > 0):
+                        stats['face_a_face'][val_r] = -1
+        return stats
+
     for nom_feuille in onglets_poules:
         ws = wb_data[nom_feuille]
         ws_f = wb_formula[nom_feuille] if (wb_formula and nom_feuille in wb_formula.sheetnames) else None
@@ -4722,6 +5047,53 @@ def extraire_resultats_classeur_excel(wb_data, wb_formula=None):
 
         if lutteurs_poule:
             resoudre_classement_deux_poules(ws, ws_f, lutteurs_poule)
+            has_explicit_clt = any(p.get("Clt_Excel") is not None for p in lutteurs_poule)
+            if not has_explicit_clt and len(lutteurs_poule) > 1:
+                import functools
+                for p_idx, p in enumerate(lutteurs_poule, 1):
+                    p["_tirage"] = p_idx
+                    st_l = collecter_stats_lutteur_nordique(wb_data, p["Nom"], nom_feuille)
+                    p["_vict"] = st_l["vict"]
+                    p["_pt_clt"] = max(float(p.get("Points", 0)), float(st_l["pt_clt"]))
+                    p["_vt"] = st_l["vt"]
+                    p["_vst"] = st_l["vst"]
+                    p["_pts_marq"] = st_l["pts_marq"]
+                    p["_pts_conc"] = st_l["pts_conc"]
+                    p["_h2h"] = st_l["face_a_face"]
+
+                def f_cmp_fflda(p_a, p_b):
+                    # 1. Nombre de victoires
+                    if p_a["_vict"] != p_b["_vict"]:
+                        return -1 if p_a["_vict"] > p_b["_vict"] else 1
+                    
+                    # 2. Si 2 lutteurs à égalité : départage direct par le résultat de leur rencontre
+                    for nom_adv, res_h in p_a.get("_h2h", {}).items():
+                        if comparer_nom_lutteur_podium(p_b["Nom"], nom_adv):
+                            if res_h == 1: return -1
+                            elif res_h == -1: return 1
+                    
+                    # 3. Plus grand nombre de points de classement obtenus
+                    if p_a["_pt_clt"] != p_b["_pt_clt"]:
+                        return -1 if p_a["_pt_clt"] > p_b["_pt_clt"] else 1
+                    # 4. Plus grand nombre de victoires par tombé (VT)
+                    if p_a["_vt"] != p_b["_vt"]:
+                        return -1 if p_a["_vt"] > p_b["_vt"] else 1
+                    # 5. Plus grand nombre de victoires par supériorité technique (VST)
+                    if p_a["_vst"] != p_b["_vst"]:
+                        return -1 if p_a["_vst"] > p_b["_vst"] else 1
+                    # 6. Plus grand nombre de points techniques marqués (Total Score)
+                    if p_a["_pts_marq"] != p_b["_pts_marq"]:
+                        return -1 if p_a["_pts_marq"] > p_b["_pts_marq"] else 1
+                    # 7. Plus petit nombre de points techniques concédés
+                    if p_a["_pts_conc"] != p_b["_pts_conc"]:
+                        return -1 if p_a["_pts_conc"] < p_b["_pts_conc"] else 1
+                    # 8. Numéro de tirage au sort le plus bas
+                    return -1 if p_a["_tirage"] < p_b["_tirage"] else 1
+
+                lutteurs_poule.sort(key=functools.cmp_to_key(f_cmp_fflda))
+                for rank_idx, p in enumerate(lutteurs_poule, 1):
+                    p["Clt_Excel"] = rank_idx
+
             sorted_p = sorted(
                 lutteurs_poule, 
                 key=lambda x: (
@@ -6400,8 +6772,10 @@ else:
                             "Tour": nettoyer_nom_tour(m.get('Nom_Tour') or m.get('Tour') or "-"),
                             "Lutteur Rouge": c1_t,
                             "Pt Clt (R)": "[   ]",
+                            "Type (R)": "[   ]",
                             "Lutteur Bleu": c2_t,
                             "Pt Clt (B)": "[   ]",
+                            "Type (B)": "[   ]",
                             "Arbitre": m.get("Arbitre", "")
                         })
                 sections_tournoi_complet.append((f"🥋 Grille de Passage & Scores - Tapis {t + 1}", pd.DataFrame(lignes_tapis_doc)))
@@ -6521,11 +6895,13 @@ else:
                     
                     dv_u9_u11 = DataValidation(type="list", formula1='"0,1,2"', allow_blank=True)
                     dv_u13 = DataValidation(type="list", formula1='"0,1,3,4,5"', allow_blank=True)
+                    dv_type = DataValidation(type="list", formula1='"VT,VST,DT,DST"', allow_blank=True)
                     ws_mat.add_data_validation(dv_u9_u11)
                     ws_mat.add_data_validation(dv_u13)
+                    ws_mat.add_data_validation(dv_type)
                     
                     ws_mat.row_dimensions[1].height = 35
-                    ws_mat.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
+                    ws_mat.merge_cells(start_row=1, start_column=1, end_row=1, end_column=11)
                     titre_mat = ws_mat.cell(row=1, column=1, value=f"🏆 {nom_competition.upper()} - GRILLE DE PASSAGE : TAPIS {t + 1} 🏆")
                     titre_mat.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
                     titre_mat.fill = bleu
@@ -6533,8 +6909,8 @@ else:
                     
                     noms_arb = ", ".join([a['Nom_Complet'] for a in tapis_arbitres[t]]) if (liste_arbitres and tapis_arbitres[t]) else "Aucun arbitre affecté"
                     ws_mat.row_dimensions[2].height = 22
-                    ws_mat.merge_cells(start_row=2, start_column=1, end_row=2, end_column=9)
-                    sub_mat = ws_mat.cell(row=2, column=1, value=f"🛡️ Arbitrage : {noms_arb}  |  * Menus déroulants Pt Clt (U9/U11 : 0, 1, 2 | U13 : 0, 1, 3, 4, 5)")
+                    ws_mat.merge_cells(start_row=2, start_column=1, end_row=2, end_column=11)
+                    sub_mat = ws_mat.cell(row=2, column=1, value=f"🛡️ Arbitrage : {noms_arb}  |  * Menus déroulants : Pt Clt (0,1,2 / 0,1,3,4,5) | Type (VT, VST, DT, DST)")
                     sub_mat.font = Font(name="Arial", size=10, italic=True, bold=True, color="0055A4")
                     sub_mat.alignment = Alignment(horizontal="center", vertical="center")
 
@@ -6544,27 +6920,29 @@ else:
                     w_nom_t = max(max_nom_t + 4, 25)
                     w_club_t = max(max_club_t + 4, 18)
 
-                    ws_mat.column_dimensions['A'].width = 16
-                    ws_mat.column_dimensions['B'].width = 6
-                    ws_mat.column_dimensions['C'].width = w_nom_t
-                    ws_mat.column_dimensions['D'].width = w_club_t
-                    ws_mat.column_dimensions['E'].width = 10
-                    ws_mat.column_dimensions['F'].width = 5
-                    ws_mat.column_dimensions['G'].width = w_nom_t
-                    ws_mat.column_dimensions['H'].width = w_club_t
-                    ws_mat.column_dimensions['I'].width = 10
+                    ws_mat.column_dimensions['A'].width = 14
+                    ws_mat.column_dimensions['B'].width = 5
+                    ws_mat.column_dimensions['C'].width = max(w_nom_t - 2, 20)
+                    ws_mat.column_dimensions['D'].width = max(w_club_t - 2, 14)
+                    ws_mat.column_dimensions['E'].width = 8
+                    ws_mat.column_dimensions['F'].width = 8
+                    ws_mat.column_dimensions['G'].width = 5
+                    ws_mat.column_dimensions['H'].width = max(w_nom_t - 2, 20)
+                    ws_mat.column_dimensions['I'].width = max(w_club_t - 2, 14)
+                    ws_mat.column_dimensions['J'].width = 8
+                    ws_mat.column_dimensions['K'].width = 8
 
                     r_curr = 4
                     m_count_t = 0
                     for item in planning_tapis[t]:
                         if item["Type"] == "PAUSE":
-                            ws_mat.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=9)
+                            ws_mat.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=11)
                             p_cell = ws_mat.cell(row=r_curr, column=1, value=f"[{item['Heure']}] ⏸️ PAUSE DE LA COMPÉTITION")
                             p_cell.fill, p_cell.font, p_cell.alignment = rouge, Font(bold=True, color="FFFFFF", size=11), Alignment(horizontal="center", vertical="center")
                             ws_mat.row_dimensions[r_curr].height = 24
                             r_curr += 2
                         elif item["Type"] == "ATTENTE":
-                            ws_mat.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=9)
+                            ws_mat.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=11)
                             a_cell = ws_mat.cell(row=r_curr, column=1, value=f"[{item['Heure']}] ⏳ {item['Texte']}")
                             a_cell.fill, a_cell.font, a_cell.alignment = PatternFill("solid", fgColor="EFEFEF"), Font(italic=True, color="666666", size=10), Alignment(horizontal="center", vertical="center")
                             ws_mat.row_dimensions[r_curr].height = 22
@@ -6609,17 +6987,24 @@ else:
                             ws_mat.cell(row=r_curr, column=4).border = b_style
                             
                             c_ptr = ws_mat.cell(row=r_curr, column=5, value="Pt Clt")
-                            c_ptr.font, c_ptr.alignment, c_ptr.border = Font(bold=True), Alignment(horizontal="center", vertical="center"), b_style
+                            c_ptr.font, c_ptr.alignment, c_ptr.border, c_ptr.fill = Font(bold=True, size=9), Alignment(horizontal="center", vertical="center"), b_style, gris_clair
+
+                            c_typer_h = ws_mat.cell(row=r_curr, column=6, value="Type")
+                            c_typer_h.font, c_typer_h.alignment, c_typer_h.border, c_typer_h.fill = Font(bold=True, size=9), Alignment(horizontal="center", vertical="center"), b_style, gris_clair
                             
-                            ws_mat.cell(row=r_curr, column=6, value="VS").alignment = Alignment(horizontal="center", vertical="center")
+                            c_vs_h = ws_mat.cell(row=r_curr, column=7, value="VS")
+                            c_vs_h.alignment, c_vs_h.border, c_vs_h.font = Alignment(horizontal="center", vertical="center"), b_style, Font(bold=True, size=9)
                             
-                            c_bleu_h = ws_mat.cell(row=r_curr, column=7, value="LUTTEUR BLEU")
+                            c_bleu_h = ws_mat.cell(row=r_curr, column=8, value="LUTTEUR BLEU")
                             c_bleu_h.fill, c_bleu_h.font, c_bleu_h.alignment, c_bleu_h.border = bleu_lutte, Font(bold=True, color="FFFFFF"), Alignment(horizontal="center", vertical="center"), b_style
-                            ws_mat.merge_cells(start_row=r_curr, start_column=7, end_row=r_curr, end_column=8)
-                            ws_mat.cell(row=r_curr, column=8).border = b_style
+                            ws_mat.merge_cells(start_row=r_curr, start_column=8, end_row=r_curr, end_column=9)
+                            ws_mat.cell(row=r_curr, column=9).border = b_style
                             
-                            c_ptb = ws_mat.cell(row=r_curr, column=9, value="Pt Clt")
-                            c_ptb.font, c_ptb.alignment, c_ptb.border = Font(bold=True), Alignment(horizontal="center", vertical="center"), b_style
+                            c_ptb = ws_mat.cell(row=r_curr, column=10, value="Pt Clt")
+                            c_ptb.font, c_ptb.alignment, c_ptb.border, c_ptb.fill = Font(bold=True, size=9), Alignment(horizontal="center", vertical="center"), b_style, gris_clair
+
+                            c_typeb_h = ws_mat.cell(row=r_curr, column=11, value="Type")
+                            c_typeb_h.font, c_typeb_h.alignment, c_typeb_h.border, c_typeb_h.fill = Font(bold=True, size=9), Alignment(horizontal="center", vertical="center"), b_style, gris_clair
                             
                             r_curr += 1
                             
@@ -6651,8 +7036,14 @@ else:
                             box_ptr = ws_mat.cell(row=r_curr, column=5)
                             box_ptr.border, box_ptr.fill = b_style, gris_clair
                             box_ptr.alignment = Alignment(horizontal="center", vertical="center")
+
+                            box_typer = ws_mat.cell(row=r_curr, column=6)
+                            box_typer.border, box_typer.fill = b_style, gris_clair
+                            box_typer.alignment = Alignment(horizontal="center", vertical="center")
+                            box_typer.font = Font(name="Arial", size=9, bold=True, color="0055A4")
+                            dv_type.add(box_typer.coordinate)
                             
-                            c_vs_mid = ws_mat.cell(row=r_curr, column=6, value="-")
+                            c_vs_mid = ws_mat.cell(row=r_curr, column=7, value="-")
                             c_vs_mid.alignment = Alignment(horizontal="center", vertical="center")
                             c_vs_mid.border = b_style
                             
@@ -6660,15 +7051,21 @@ else:
                             if item.get('Club 2'): c2_str += f" ({item['Club 2']})"
                             if item.get('Comité 2') and item['Comité 2'] != 'Comité Non Renseigné': c2_str += f" - {item['Comité 2']}"
                             
-                            c_b_info = ws_mat.cell(row=r_curr, column=7, value=c2_str)
+                            c_b_info = ws_mat.cell(row=r_curr, column=8, value=c2_str)
                             c_b_info.border = b_style
                             c_b_info.alignment = Alignment(vertical="center")
-                            ws_mat.merge_cells(start_row=r_curr, start_column=7, end_row=r_curr, end_column=8)
-                            ws_mat.cell(row=r_curr, column=8).border = b_style
+                            ws_mat.merge_cells(start_row=r_curr, start_column=8, end_row=r_curr, end_column=9)
+                            ws_mat.cell(row=r_curr, column=9).border = b_style
                             
-                            box_ptb = ws_mat.cell(row=r_curr, column=9)
+                            box_ptb = ws_mat.cell(row=r_curr, column=10)
                             box_ptb.border, box_ptb.fill = b_style, gris_clair
                             box_ptb.alignment = Alignment(horizontal="center", vertical="center")
+
+                            box_typeb = ws_mat.cell(row=r_curr, column=11)
+                            box_typeb.border, box_typeb.fill = b_style, gris_clair
+                            box_typeb.alignment = Alignment(horizontal="center", vertical="center")
+                            box_typeb.font = Font(name="Arial", size=9, bold=True, color="0055A4")
+                            dv_type.add(box_typeb.coordinate)
                             
                             # Menus déroulants sous Pt Clt selon la catégorie d'âge (U9/U11 : 0,1,2 | U13 : 0,1,3,4,5)
                             if age_m in ['U9', 'U11']:
@@ -6690,7 +7087,7 @@ else:
                             c1_m = str(item.get('Combattant 1', ''))
                             c2_m = str(item.get('Combattant 2', ''))
                             s1 = (ws_mat, f"C{r_curr}")
-                            s2 = (ws_mat, f"G{r_curr}")
+                            s2 = (ws_mat, f"H{r_curr}")
                             
                             reg_tapis_slot((cat_m, c1_m), s1)
                             reg_tapis_slot((cat_m, c2_m), s2)
@@ -6711,10 +7108,12 @@ else:
                             ws_mat.cell(row=r_curr, column=3, value="Points Techniques (Actions)").font = Font(size=9, italic=True)
                             ws_mat.merge_cells(start_row=r_curr, start_column=3, end_row=r_curr, end_column=4)
                             ws_mat.cell(row=r_curr, column=5, value="Total Score").font = Font(size=9, italic=True)
+                            ws_mat.merge_cells(start_row=r_curr, start_column=5, end_row=r_curr, end_column=6)
                             
-                            ws_mat.cell(row=r_curr, column=7, value="Points Techniques (Actions)").font = Font(size=9, italic=True)
-                            ws_mat.merge_cells(start_row=r_curr, start_column=7, end_row=r_curr, end_column=8)
-                            ws_mat.cell(row=r_curr, column=9, value="Total Score").font = Font(size=9, italic=True)
+                            ws_mat.cell(row=r_curr, column=8, value="Points Techniques (Actions)").font = Font(size=9, italic=True)
+                            ws_mat.merge_cells(start_row=r_curr, start_column=8, end_row=r_curr, end_column=9)
+                            ws_mat.cell(row=r_curr, column=10, value="Total Score").font = Font(size=9, italic=True)
+                            ws_mat.merge_cells(start_row=r_curr, start_column=10, end_row=r_curr, end_column=11)
                             
                             r_curr += 1
                             
@@ -6724,25 +7123,39 @@ else:
                             ws_mat.cell(row=r_curr, column=4).border = b_style
                             ws_mat.merge_cells(start_row=r_curr, start_column=3, end_row=r_curr, end_column=4)
                             
-                            ws_mat.cell(row=r_curr, column=5).border = b_style
-                            
-                            c_act_b = ws_mat.cell(row=r_curr, column=7)
-                            c_act_b.border = b_style
-                            ws_mat.cell(row=r_curr, column=8).border = b_style
-                            ws_mat.merge_cells(start_row=r_curr, start_column=7, end_row=r_curr, end_column=8)
-                            
-                            ws_mat.cell(row=r_curr, column=9).border = b_style
+                            c_tot_r = ws_mat.cell(row=r_curr, column=5)
+                            c_tot_r.border = b_style
+                            c_tot_r.alignment = Alignment(horizontal="center", vertical="center")
+                            c_tot_r.font = Font(name="Arial", size=10, bold=True)
+                            ws_mat.cell(row=r_curr, column=6).border = b_style
+                            ws_mat.merge_cells(start_row=r_curr, start_column=5, end_row=r_curr, end_column=6)
 
-                            # Enregistrement des coordonnées des cases Pt Clt, Actions et Total Score sur la Grille Tapis X
+                            ws_mat.cell(row=r_curr, column=7).border = b_style
+                            
+                            c_act_b = ws_mat.cell(row=r_curr, column=8)
+                            c_act_b.border = b_style
+                            ws_mat.cell(row=r_curr, column=9).border = b_style
+                            ws_mat.merge_cells(start_row=r_curr, start_column=8, end_row=r_curr, end_column=9)
+                            
+                            c_tot_b = ws_mat.cell(row=r_curr, column=10)
+                            c_tot_b.border = b_style
+                            c_tot_b.alignment = Alignment(horizontal="center", vertical="center")
+                            c_tot_b.font = Font(name="Arial", size=10, bold=True)
+                            ws_mat.cell(row=r_curr, column=11).border = b_style
+                            ws_mat.merge_cells(start_row=r_curr, start_column=10, end_row=r_curr, end_column=11)
+
+                            # Enregistrement des coordonnées des cases Pt Clt, Type, Actions et Total Score sur la Grille Tapis X
                             m_coord_info = {
                                 'sheet': f"Grille Tapis {t + 1}",
                                 'sheet_name': f"Grille Tapis {t + 1}",
                                 'ptr_cell': f"E{r_curr - 2}",
-                                'ptb_cell': f"I{r_curr - 2}",
-                                'act_r_cell': f"C{r_curr}",
+                                'typer_cell': f"F{r_curr - 2}",
                                 'tot_r_cell': f"E{r_curr}",
-                                'act_b_cell': f"G{r_curr}",
-                                'tot_b_cell': f"I{r_curr}",
+                                'act_r_cell': f"C{r_curr}",
+                                'ptb_cell': f"J{r_curr - 2}",
+                                'typeb_cell': f"K{r_curr - 2}",
+                                'tot_b_cell': f"J{r_curr}",
+                                'act_b_cell': f"H{r_curr}",
                                 'p1': item['Combattant 1'],
                                 'p2': item['Combattant 2']
                             }
@@ -7004,11 +7417,13 @@ else:
                                     "N°": m_count_st,
                                     "LUTTEUR ROUGE": f"🔴 {m['Combattant 1']}{c1_cl}{c1_co}",
                                     "Pt Clt (Rouge)": "[   ]",
+                                    "Type (Rouge)": "[   ]",
                                     "Points Techniques (Actions Rouge)": "[                                 ]",
                                     "Total Score (Rouge)": "[   ]",
                                     "VS": "VS",
                                     "LUTTEUR BLEU": f"🔵 {m['Combattant 2']}{c2_cl}{c2_co}",
                                     "Pt Clt (Bleu)": "[   ]",
+                                    "Type (Bleu)": "[   ]",
                                     "Points Techniques (Actions Bleu)": "[                                 ]",
                                     "Total Score (Bleu)": "[   ]"
                                 }

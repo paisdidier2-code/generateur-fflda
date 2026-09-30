@@ -2982,6 +2982,8 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
 
     dv_nordic_type = DataValidation(type="list", formula1='"VT,VST,DT,DST"', allow_blank=True)
     dv_nordic_pts = DataValidation(type="list", formula1='"0,1,3,4,5"' if is_u13_nordique else '"0,1,2"', allow_blank=True)
+    has_nordic_type = False
+    has_nordic_pts = False
 
     nb_tours = len(rondes) if rondes else 0
     headers = ["CLT", "N°", "NOM Prénom", "CLUB", "COMITÉ"]
@@ -3129,10 +3131,18 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
                 with_details=True
             )
             
-            if hasattr(c_pt_r, 'coordinate'): dv_nordic_pts.add(c_pt_r.coordinate)
-            if hasattr(c_pt_b, 'coordinate'): dv_nordic_pts.add(c_pt_b.coordinate)
-            if c_ty_r and hasattr(c_ty_r, 'coordinate'): dv_nordic_type.add(c_ty_r.coordinate)
-            if c_ty_b and hasattr(c_ty_b, 'coordinate'): dv_nordic_type.add(c_ty_b.coordinate)
+            if hasattr(c_pt_r, 'coordinate'):
+                dv_nordic_pts.add(c_pt_r.coordinate)
+                has_nordic_pts = True
+            if hasattr(c_pt_b, 'coordinate'):
+                dv_nordic_pts.add(c_pt_b.coordinate)
+                has_nordic_pts = True
+            if c_ty_r and hasattr(c_ty_r, 'coordinate'):
+                dv_nordic_type.add(c_ty_r.coordinate)
+                has_nordic_type = True
+            if c_ty_b and hasattr(c_ty_b, 'coordinate'):
+                dv_nordic_type.add(c_ty_b.coordinate)
+                has_nordic_type = True
             
             p1_nom = p1.get('Nom', '') if isinstance(p1, dict) else str(p1)
             p2_nom = p2.get('Nom', '') if isinstance(p2, dict) else str(p2)
@@ -3311,9 +3321,9 @@ def construire_feuille_poule_nordique_excel(ws, nom_poule, liste_p, rondes, coor
         )
         draw_excel_podium_card(ws, 10, col_pod, "🥉 3ème PLACE (BRONZE)", "En attente", fill_bronze, font_color="9A3412", formula_val=form_bronze)
 
-    if dv_nordic_pts.sqref and len(dv_nordic_pts.sqref) > 0:
+    if has_nordic_pts:
         ws.add_data_validation(dv_nordic_pts)
-    if dv_nordic_type.sqref and len(dv_nordic_type.sqref) > 0:
+    if has_nordic_type:
         ws.add_data_validation(dv_nordic_type)
 
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
@@ -6894,6 +6904,9 @@ else:
                     dv_u9_u11 = DataValidation(type="list", formula1='"0,1,2"', allow_blank=True)
                     dv_u13 = DataValidation(type="list", formula1='"0,1,3,4,5"', allow_blank=True)
                     dv_type = DataValidation(type="list", formula1='"VT,VST,DT,DST"', allow_blank=True)
+                    has_u9_u11 = False
+                    has_u13 = False
+                    has_type = False
                     
                     ws_mat.row_dimensions[1].height = 35
                     ws_mat.merge_cells(start_row=1, start_column=1, end_row=1, end_column=11)
@@ -7037,6 +7050,7 @@ else:
                             box_typer.alignment = Alignment(horizontal="center", vertical="center")
                             box_typer.font = Font(name="Arial", size=9, bold=True, color="0055A4")
                             dv_type.add(box_typer.coordinate)
+                            has_type = True
                             
                             c_vs_mid = ws_mat.cell(row=r_curr, column=7, value="-")
                             c_vs_mid.alignment = Alignment(horizontal="center", vertical="center")
@@ -7061,14 +7075,17 @@ else:
                             box_typeb.alignment = Alignment(horizontal="center", vertical="center")
                             box_typeb.font = Font(name="Arial", size=9, bold=True, color="0055A4")
                             dv_type.add(box_typeb.coordinate)
+                            has_type = True
                             
                             # Menus déroulants sous Pt Clt selon la catégorie d'âge (U9/U11 : 0,1,2 | U13 : 0,1,3,4,5)
                             if age_m in ['U9', 'U11']:
                                 dv_u9_u11.add(box_ptr.coordinate)
                                 dv_u9_u11.add(box_ptb.coordinate)
+                                has_u9_u11 = True
                             elif age_m == 'U13':
                                 dv_u13.add(box_ptr.coordinate)
                                 dv_u13.add(box_ptb.coordinate)
+                                has_u13 = True
                             
                             def reg_tapis_slot(k, sl):
                                 if k not in tapis_slots_map:
@@ -7162,11 +7179,11 @@ else:
                             
                             r_curr += 2 
                     
-                    if dv_u9_u11.sqref and len(dv_u9_u11.sqref) > 0:
+                    if has_u9_u11:
                         ws_mat.add_data_validation(dv_u9_u11)
-                    if dv_u13.sqref and len(dv_u13.sqref) > 0:
+                    if has_u13:
                         ws_mat.add_data_validation(dv_u13)
-                    if dv_type.sqref and len(dv_type.sqref) > 0:
+                    if has_type:
                         ws_mat.add_data_validation(dv_type)
                 
                 for ws_name in writer.book.sheetnames:
